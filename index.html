@@ -215,12 +215,63 @@
       overflow: hidden;
       background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
       border: 1px solid rgba(255,255,255,0.04);
+      touch-action: none;
     }
 
     #forecastCanvas {
       width: 100%;
       height: 100%;
       display: block;
+    }
+
+    .chart-tooltip {
+      position: absolute;
+      z-index: 5;
+      min-width: 132px;
+      max-width: 180px;
+      pointer-events: none;
+      border-radius: 18px;
+      padding: 10px 12px;
+      background: rgba(10,10,10,0.92);
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+      color: var(--text);
+      font-size: 0.86rem;
+      line-height: 1.15;
+      backdrop-filter: blur(8px);
+    }
+
+    .chart-tooltip strong {
+      color: var(--lcars-apricot);
+      font-weight: 500;
+    }
+
+    .chart-tooltip .tt-time {
+      color: var(--lcars-apricot);
+      margin-bottom: 6px;
+      font-size: 0.92rem;
+    }
+
+    .chart-tooltip .tt-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 3px;
+    }
+
+    .chart-tooltip .tt-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--muted);
+    }
+
+    .chart-tooltip .tt-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      display: inline-block;
     }
 
     .forecast-meta {
@@ -528,6 +579,7 @@
       </div>
       <div class="forecast-canvas-wrap">
         <canvas id="forecastCanvas"></canvas>
+        <div id="chartTooltip" class="chart-tooltip" hidden></div>
       </div>
       <div class="forecast-meta">
         <span><strong id="metaMin">--°</strong> MIN</span>
@@ -635,6 +687,7 @@
       closeSearchButton: document.getElementById('closeSearchButton'),
       toast: document.getElementById('toast'),
       forecastCanvas: document.getElementById('forecastCanvas'),
+      chartTooltip: document.getElementById('chartTooltip'),
     };
 
     function toast(message) {
@@ -780,7 +833,7 @@
       const url = new URL('https://api.open-meteo.com/v1/forecast');
       url.searchParams.set('latitude', location.latitude);
       url.searchParams.set('longitude', location.longitude);
-      url.searchParams.set('hourly', 'precipitation');
+      url.searchParams.set('hourly', 'precipitation,temperature_2m');
       url.searchParams.set('daily', 'sunrise,sunset');
       url.searchParams.set('current', 'temperature_2m');
       url.searchParams.set('forecast_days', '4');
@@ -808,27 +861,30 @@
     }
 
     async function fetchWeatherForLocation(location) {
-      const [baseResult, modelResults] = await Promise.all([
-        fetchBaseForecast(location),
-        Promise.allSettled(MODELS.map(model => fetchModelForecast(location, model))),
-      ]);
-
+      const baseResult = await fetchBaseForecast(location);
       const base = extractBaseForecast72h(baseResult);
       const byModel = {};
 
-      modelResults.forEach((result, index) => {
-        const model = MODELS[index];
-        if (result.status === 'fulfilled') {
-          byModel[model.key] = extractModelForecast72h(result.value);
+      for (const model of MODELS) {
+        try {
+          const modelData = await fetchModelForecast(location, model);
+          byModel[model.key] = extractModelForecast72h(modelData);
+        } catch (error) {
+          console.warn(`Modell ${model.key} ausgefallen`, error);
         }
-      });
+      }
 
       const availableModelKeys = Object.keys(byModel);
       if (!availableModelKeys.length) {
-        throw new Error('Kein Wettermodell verfügbar');
+        const fallbackTemps = baseResult.hourly?.temperature_2m?.slice(0, 72);
+        if (fallbackTemps && fallbackTemps.length) {
+          byModel.ecmwf = { times: base.times, temps: fallbackTemps };
+        } else {
+          throw new Error('Kein Wettermodell verfügbar');
+        }
       }
 
-      const referenceKey = byModel.ecmwf ? 'ecmwf' : availableModelKeys[0];
+      const referenceKey = byModel.ecmwf ? 'ecmwf' : Object.keys(byModel)[0];
 
       return {
         location,
@@ -910,6 +966,20 @@
       const yRainBase = padding.top + tempZoneHeight + 6 + rainZoneHeight;
       const yForRainTop = (value) => yRainBase - (value / maxRain) * rainZoneHeight;
 
+      state.chartMetrics = {
+        rect,
+        padding,
+        times,
+        xForIndex,
+        yForTemp,
+        yRainBase,
+        minTemp,
+        maxTemp,
+        tempRange,
+        chartW,
+        maxRain,
+      };
+
       ctx.save();
       ctx.strokeStyle = 'rgba(210, 192, 255, 0.10)';
       ctx.lineWidth = 1;
@@ -939,12 +1009,12 @@
       ctx.restore();
 
       ctx.save();
-      ctx.fillStyle = 'rgba(255,156,47,0.42)';
-      const barWidth = Math.max(2, chartW / times.length - 1.5);
       weather.rain.forEach((value, i) => {
-        const x = xForIndex(i) - barWidth / 2;
+        const x = xForIndex(i) - Math.max(2, chartW / times.length - 1.5) / 2;
         const y = yForRainTop(value);
-        ctx.fillRect(x, y, barWidth, Math.max(1, yRainBase - y));
+        const alpha = value >= 1.5 ? 0.75 : value >= 0.5 ? 0.55 : 0.35;
+        ctx.fillStyle = `rgba(255,156,47,${alpha})`;
+        ctx.fillRect(x, y, Math.max(2, chartW / times.length - 1.5), Math.max(1, yRainBase - y));
       });
       ctx.restore();
 
@@ -953,7 +1023,7 @@
         if (!series) return;
         ctx.save();
         ctx.strokeStyle = model.color;
-        ctx.globalAlpha = 0.8;
+        ctx.globalAlpha = 0.82;
         ctx.lineWidth = 2.2;
         ctx.beginPath();
         series.forEach((temp, i) => {
@@ -965,6 +1035,69 @@
         ctx.stroke();
         ctx.restore();
       });
+
+      const now = Date.now();
+      const nowIndex = times.findIndex(t => new Date(t).getTime() >= now);
+      if (nowIndex >= 0) {
+        const x = xForIndex(nowIndex);
+        ctx.save();
+        ctx.strokeStyle = 'rgba(246,184,140,0.95)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([5, 4]);
+        ctx.beginPath();
+        ctx.moveTo(x, padding.top);
+        ctx.lineTo(x, yRainBase);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = 'rgba(246,184,140,0.95)';
+        ctx.font = '12px Oswald';
+        ctx.textAlign = 'center';
+        ctx.fillText('JETZT', x, padding.top - 8);
+        ctx.restore();
+
+        MODELS.forEach(model => {
+          const value = weather.byModel[model.key]?.temps?.[nowIndex];
+          if (value == null) return;
+          const y = yForTemp(value);
+          ctx.save();
+          ctx.fillStyle = model.color;
+          ctx.beginPath();
+          ctx.arc(x, y, 4, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.lineWidth = 1.5;
+          ctx.strokeStyle = 'rgba(0,0,0,0.65)';
+          ctx.stroke();
+          ctx.restore();
+        });
+      }
+
+      if (state.chartHoverIndex != null) {
+        const i = state.chartHoverIndex;
+        const x = xForIndex(i);
+        ctx.save();
+        ctx.strokeStyle = 'rgba(157,151,245,0.95)';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(x, padding.top);
+        ctx.lineTo(x, yRainBase);
+        ctx.stroke();
+        ctx.restore();
+
+        MODELS.forEach(model => {
+          const value = weather.byModel[model.key]?.temps?.[i];
+          if (value == null) return;
+          const y = yForTemp(value);
+          ctx.save();
+          ctx.fillStyle = model.color;
+          ctx.beginPath();
+          ctx.arc(x, y, 4.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.lineWidth = 1.5;
+          ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+          ctx.stroke();
+          ctx.restore();
+        });
+      }
 
       ctx.save();
       ctx.font = '12px Oswald';
@@ -1007,6 +1140,7 @@
       els.footerLeft.innerHTML = `LETZTES UPDATE <strong>${state.lastUpdate ? formatTime(state.lastUpdate) : '--:--'}</strong>`;
       updateStatusLabel();
       renderFavorites();
+      hideChartTooltip();
       drawForecastChart(weather);
     }
 
@@ -1071,14 +1205,15 @@
         if (focusMap && state.map) state.map.setView([state.location.latitude, state.location.longitude], 8, { animate: false });
       } catch (error) {
         console.error(error);
-        console.log('Aktueller Ort:', state.location);
+        const message = error && error.message ? error.message : 'Unbekannter Fehler';
         state.isOffline = !navigator.onLine;
         updateStatusLabel();
+        els.footerLeft.innerHTML = `FEHLER <strong>${message.replace(/</g, '&lt;').replace(/>/g, '&gt;').slice(0, 80)}</strong>`;
         if (state.weather) {
           updateSummary(state.weather);
-          toast('Netzwerkfehler. Zeige letzte Daten');
+          toast(`Fehler: ${message}`);
         } else {
-          toast('Wetterdaten konnten nicht geladen werden');
+          toast(`Fehler: ${message}`);
         }
       }
     }
@@ -1137,6 +1272,79 @@
       });
     }
 
+    function getChartIndexFromEvent(event) {
+      if (!state.chartMetrics || !state.weather) return null;
+      const rect = els.forecastCanvas.getBoundingClientRect();
+      const clientX = event.touches?.[0]?.clientX ?? event.clientX;
+      const x = clientX - rect.left;
+      const { padding, chartW, times } = state.chartMetrics;
+      if (x < padding.left || x > rect.width - padding.right) return null;
+      const ratio = (x - padding.left) / chartW;
+      return Math.max(0, Math.min(times.length - 1, Math.round(ratio * (times.length - 1))));
+    }
+
+    function showChartTooltip(index, event) {
+      if (!state.weather || index == null) return;
+      const time = state.weather.times[index];
+      const rain = state.weather.rain[index] ?? 0;
+      const rows = MODELS
+        .map(model => {
+          const value = state.weather.byModel[model.key]?.temps?.[index];
+          if (value == null) return '';
+          return `<div class="tt-row"><span class="tt-label"><span class="tt-dot" style="background:${model.color}"></span>${model.label}</span><strong>${Math.round(value)}°</strong></div>`;
+        })
+        .join('');
+      els.chartTooltip.innerHTML = `
+        <div class="tt-time">${formatDayDate(time)} ${formatTime(time)}</div>
+        ${rows}
+        <div class="tt-row"><span class="tt-label">Regen</span><strong>${rain.toFixed(1)} mm</strong></div>
+      `;
+      els.chartTooltip.hidden = false;
+      const wrapRect = els.forecastCanvas.parentElement.getBoundingClientRect();
+      const pointX = (event.touches?.[0]?.clientX ?? event.clientX) - wrapRect.left;
+      const tooltipWidth = 156;
+      const left = Math.max(8, Math.min(wrapRect.width - tooltipWidth - 8, pointX - tooltipWidth / 2));
+      els.chartTooltip.style.left = `${left}px`;
+      els.chartTooltip.style.top = '8px';
+    }
+
+    function hideChartTooltip() {
+      els.chartTooltip.hidden = true;
+      state.chartHoverIndex = null;
+    }
+
+    function setupChartInteractions() {
+      const wrap = els.forecastCanvas.parentElement;
+      const onMove = (event) => {
+        if (!state.weather) return;
+        const index = getChartIndexFromEvent(event);
+        if (index == null) {
+          hideChartTooltip();
+          drawForecastChart(state.weather);
+          return;
+        }
+        state.chartHoverIndex = index;
+        drawForecastChart(state.weather);
+        showChartTooltip(index, event);
+      };
+      wrap.addEventListener('pointermove', onMove);
+      wrap.addEventListener('pointerdown', onMove);
+      wrap.addEventListener('pointerleave', () => {
+        if (!state.weather) return;
+        hideChartTooltip();
+        drawForecastChart(state.weather);
+      });
+      wrap.addEventListener('touchstart', onMove, { passive: true });
+      wrap.addEventListener('touchmove', onMove, { passive: true });
+      wrap.addEventListener('touchend', () => {
+        if (!state.weather) return;
+        setTimeout(() => {
+          hideChartTooltip();
+          drawForecastChart(state.weather);
+        }, 1200);
+      });
+    }
+
     function setupNetworkEvents() {
       window.addEventListener('online', async () => {
         state.isOffline = false;
@@ -1188,6 +1396,7 @@
       setInterval(updateClock, 1000 * 30);
       setupSearch();
       setupNetworkEvents();
+      setupChartInteractions();
       initMap();
       renderFavorites();
       if (state.weather) updateSummary(state.weather);
