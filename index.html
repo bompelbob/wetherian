@@ -580,9 +580,9 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script>
     const MODELS = [
-      { key: 'ecmwf', label: 'ECMWF', color: '#f6b88c' },
-      { key: 'icon', label: 'ICON', color: '#ff9c2f' },
-      { key: 'gfs', label: 'GFS', color: '#9d97f5' },
+      { key: 'ecmwf', label: 'ECMWF', color: '#f6b88c', endpoint: 'https://api.open-meteo.com/v1/ecmwf' },
+      { key: 'icon', label: 'ICON', color: '#ff9c2f', endpoint: 'https://api.open-meteo.com/v1/dwd-icon' },
+      { key: 'gfs', label: 'GFS', color: '#9d97f5', endpoint: 'https://api.open-meteo.com/v1/gfs' },
     ];
 
     const DEFAULT_FAVORITES = [
@@ -761,48 +761,83 @@
       }));
     }
 
-    async function fetchModelForecast(location, modelKey) {
+    async function fetchModelForecast(location, model) {
+      const url = new URL(model.endpoint);
+      url.searchParams.set('latitude', location.latitude);
+      url.searchParams.set('longitude', location.longitude);
+      url.searchParams.set('hourly', 'temperature_2m');
+      url.searchParams.set('forecast_days', '4');
+      url.searchParams.set('timezone', 'auto');
+      const response = await fetch(url.toString(), { cache: 'no-store' });
+      if (!response.ok) {
+        const text = await response.text().catch(() => '');
+        throw new Error(`Forecast fehlgeschlagen für ${model.key}: ${response.status} ${text}`);
+      }
+      return response.json();
+    }
+
+    async function fetchBaseForecast(location) {
       const url = new URL('https://api.open-meteo.com/v1/forecast');
       url.searchParams.set('latitude', location.latitude);
       url.searchParams.set('longitude', location.longitude);
-      url.searchParams.set('hourly', 'temperature_2m,precipitation');
+      url.searchParams.set('hourly', 'precipitation');
       url.searchParams.set('daily', 'sunrise,sunset');
       url.searchParams.set('current', 'temperature_2m');
       url.searchParams.set('forecast_days', '4');
       url.searchParams.set('timezone', 'auto');
-      url.searchParams.set('models', modelKey);
       const response = await fetch(url.toString(), { cache: 'no-store' });
-      if (!response.ok) throw new Error(`Forecast fehlgeschlagen für ${modelKey}`);
+      if (!response.ok) throw new Error('Basis-Forecast fehlgeschlagen');
       return response.json();
     }
 
-    function extractForecast72h(apiData) {
-      const times = apiData.hourly.time.slice(0, 72);
+    function extractModelForecast72h(apiData) {
       return {
-        times,
+        times: apiData.hourly.time.slice(0, 72),
         temps: apiData.hourly.temperature_2m.slice(0, 72),
+      };
+    }
+
+    function extractBaseForecast72h(apiData) {
+      return {
+        times: apiData.hourly.time.slice(0, 72),
         rain: apiData.hourly.precipitation.slice(0, 72),
-        currentTemp: apiData.current?.temperature_2m ?? apiData.hourly.temperature_2m[0],
+        currentTemp: apiData.current?.temperature_2m ?? null,
         sunrise: apiData.daily?.sunrise?.[0] ?? null,
         sunset: apiData.daily?.sunset?.[0] ?? null,
       };
     }
 
     async function fetchWeatherForLocation(location) {
-      const entries = await Promise.all(MODELS.map(async model => ({
-        key: model.key,
-        data: extractForecast72h(await fetchModelForecast(location, model.key)),
-      })));
-      const byModel = Object.fromEntries(entries.map(entry => [entry.key, entry.data]));
-      const reference = byModel.ecmwf || byModel.icon || byModel.gfs;
+      const [baseResult, modelResults] = await Promise.all([
+        fetchBaseForecast(location),
+        Promise.allSettled(MODELS.map(model => fetchModelForecast(location, model))),
+      ]);
+
+      const base = extractBaseForecast72h(baseResult);
+      const byModel = {};
+
+      modelResults.forEach((result, index) => {
+        const model = MODELS[index];
+        if (result.status === 'fulfilled') {
+          byModel[model.key] = extractModelForecast72h(result.value);
+        }
+      });
+
+      const availableModelKeys = Object.keys(byModel);
+      if (!availableModelKeys.length) {
+        throw new Error('Kein Wettermodell verfügbar');
+      }
+
+      const referenceKey = byModel.ecmwf ? 'ecmwf' : availableModelKeys[0];
+
       return {
         location,
         byModel,
-        sunrise: reference.sunrise,
-        sunset: reference.sunset,
-        times: reference.times,
-        rain: reference.rain,
-        currentTemp: reference.currentTemp,
+        sunrise: base.sunrise,
+        sunset: base.sunset,
+        times: byModel[referenceKey].times,
+        rain: base.rain,
+        currentTemp: base.currentTemp ?? byModel[referenceKey].temps[0],
       };
     }
 
@@ -817,7 +852,7 @@
           const response = await fetch(url.toString(), { cache: 'no-store' });
           if (!response.ok) throw new Error();
           const data = await response.json();
-          return { ...favorite, temperature: Math.round(data.current.temperature_2m) };
+          return { ...favorite, temperature: Math.round(data.current?.temperature_2m ?? data.hourly?.temperature_2m?.[0] ?? 0) };
         } catch {
           return { ...favorite, temperature: favorite.temperature ?? null };
         }
@@ -959,11 +994,11 @@
     function updateSummary(weather) {
       els.locationName.textContent = state.location.name;
       els.currentTempNow.textContent = `${Math.round(weather.currentTemp)}°`;
-      const ecmwf = weather.byModel.ecmwf?.temps || [];
+      const referenceTemps = weather.byModel.ecmwf?.temps || weather.byModel.icon?.temps || weather.byModel.gfs?.temps || [];
       const rainTotal = weather.rain.reduce((sum, value) => sum + (value || 0), 0);
-      if (ecmwf.length) {
-        els.metaMin.textContent = `${Math.round(Math.min(...ecmwf))}°`;
-        els.metaMax.textContent = `${Math.round(Math.max(...ecmwf))}°`;
+      if (referenceTemps.length) {
+        els.metaMin.textContent = `${Math.round(Math.min(...referenceTemps))}°`;
+        els.metaMax.textContent = `${Math.round(Math.max(...referenceTemps))}°`;
       }
       els.metaRain.textContent = `${rainTotal.toFixed(1)} mm`;
       els.sunriseValue.textContent = `SUNRISE ${weather.sunrise ? formatTime(weather.sunrise) : '--:--'}`;
@@ -1036,6 +1071,7 @@
         if (focusMap && state.map) state.map.setView([state.location.latitude, state.location.longitude], 8, { animate: false });
       } catch (error) {
         console.error(error);
+        console.log('Aktueller Ort:', state.location);
         state.isOffline = !navigator.onLine;
         updateStatusLabel();
         if (state.weather) {
