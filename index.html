@@ -70,7 +70,7 @@
 
 .daily-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
   width: 100%;
   min-height: 0;
@@ -1394,7 +1394,7 @@ function renderDailySummary(weather) {
     entry.codes.push(weather.weatherCodes[i]);
   });
 
-  const days = [...groups.values()].slice(0, 3);
+  const days = [...groups.values()].slice(0, 4);
 
   els.dailySummary.innerHTML = days.map((day, index) => {
     const min = Math.round(Math.min(...day.temps));
