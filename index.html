@@ -10,9 +10,12 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="LCARS Weather" />
   <meta name="mobile-web-app-capable" content="yes" />
+
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
   <style>
     :root {
       --bg: #000000;
@@ -34,7 +37,11 @@
     }
 
     * { box-sizing: border-box; }
-    html, body { height: 100%; }
+
+    html, body {
+      height: 100%;
+    }
+
     body {
       margin: 0;
       background: var(--bg);
@@ -42,18 +49,20 @@
       font-family: 'Oswald', sans-serif;
       overflow: hidden;
       letter-spacing: 0.02em;
+      overscroll-behavior: none;
     }
 
     .app {
       height: 100dvh;
       padding: calc(12px + var(--safe-top)) 12px calc(10px + var(--safe-bottom));
       display: grid;
-      grid-template-rows: 0.11fr 0.43fr 0.07fr 0.12fr 0.21fr 0.06fr;
+      grid-template-rows: 0.11fr 0.39fr 0.07fr 0.10fr 0.27fr 0.06fr;
       gap: 10px;
       background:
         radial-gradient(circle at top right, rgba(157,151,245,0.12), transparent 28%),
         radial-gradient(circle at bottom left, rgba(255,156,47,0.10), transparent 35%),
         #000;
+      touch-action: pan-x;
     }
 
     .panel {
@@ -69,12 +78,11 @@
       height: 100%;
     }
 
-    
-
     .lcars-main {
       min-width: 0;
       display: flex;
       flex-direction: column;
+      height: 100%;
     }
 
     .header {
@@ -83,6 +91,7 @@
       align-items: center;
       padding: 10px 8px;
       min-width: 0;
+      gap: 10px;
     }
 
     .location-block {
@@ -112,6 +121,7 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      min-width: 0;
     }
 
     .location-button {
@@ -122,6 +132,7 @@
       padding: 7px 12px;
       font: inherit;
       cursor: pointer;
+      flex-shrink: 0;
     }
 
     .status-box {
@@ -129,7 +140,7 @@
       flex-direction: column;
       align-items: flex-end;
       gap: 4px;
-      padding-left: 10px;
+      min-width: 70px;
     }
 
     .clock {
@@ -145,6 +156,7 @@
       background: rgba(157,151,245,0.16);
       padding: 5px 10px;
       border-radius: 999px;
+      white-space: nowrap;
     }
 
     .forecast-panel {
@@ -158,8 +170,9 @@
       display: grid;
       grid-template-columns: auto 1fr auto;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
       padding: 0 4px;
+      min-width: 0;
     }
 
     .forecast-title {
@@ -169,32 +182,39 @@
       padding: 6px 12px;
       border-radius: 999px;
       background: rgba(255,156,47,0.12);
+      white-space: nowrap;
     }
 
     .model-legend {
       display: flex;
       justify-content: center;
-      gap: 10px;
-      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: nowrap;
       min-width: 0;
+      overflow: hidden;
     }
 
     .legend-item {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
       color: var(--text);
-      font-size: 0.88rem;
+      font-size: 0.74rem;
       background: rgba(255,255,255,0.03);
-      padding: 4px 8px;
+      padding: 3px 6px;
       border-radius: 999px;
+      white-space: nowrap;
+      flex-shrink: 1;
+      min-width: 0;
     }
 
     .legend-dot {
-      width: 10px;
-      height: 10px;
+      width: 8px;
+      height: 8px;
       border-radius: 999px;
       display: inline-block;
+      flex-shrink: 0;
     }
 
     .forecast-canvas-wrap {
@@ -298,6 +318,7 @@
       color: var(--muted);
       font-size: 0.95rem;
       text-align: center;
+      white-space: nowrap;
     }
 
     .favorites-panel {
@@ -390,6 +411,7 @@
       padding: 5px 10px;
       border-radius: 999px;
       background: rgba(246,184,140,0.12);
+      white-space: nowrap;
     }
 
     .map-wrap {
@@ -418,6 +440,7 @@
       color: var(--muted);
       font-size: 0.88rem;
       line-height: 1;
+      min-width: 0;
     }
 
     .footer strong {
@@ -435,7 +458,9 @@
       box-shadow: 0 16px 50px rgba(0,0,0,0.65);
     }
 
-    dialog::backdrop { background: rgba(0,0,0,0.65); }
+    dialog::backdrop {
+      background: rgba(0,0,0,0.65);
+    }
 
     .search-box {
       padding: 16px;
@@ -499,6 +524,7 @@
     .dialog-actions {
       display: flex;
       justify-content: flex-end;
+      gap: 8px;
     }
 
     .close-button {
@@ -522,18 +548,21 @@
       opacity: 0;
       pointer-events: none;
       transition: opacity 160ms ease;
+      white-space: nowrap;
     }
 
-    .toast.show { opacity: 1; }
+    .toast.show {
+      opacity: 1;
+    }
 
     @media (max-height: 760px) {
       .app { gap: 8px; }
-      .forecast-meta, .footer, .radar-time, .status, .sun-date, .sun-chip, .legend-item { font-size: 0.8rem; }
-      .favorite-temp { font-size: 1.1rem; }
-      .favorite-name { font-size: 0.92rem; }
+      .forecast-meta, .footer, .radar-time, .status, .sun-date, .sun-chip, .legend-item { font-size: 0.78rem; }
+      .favorite-temp { font-size: 1.08rem; }
+      .favorite-name { font-size: 0.9rem; }
+      .forecast-title { font-size: 0.92rem; }
     }
   </style>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 </head>
 <body>
   <main class="app">
@@ -609,6 +638,7 @@
       </form>
       <div id="searchResults" class="search-results"></div>
       <div class="dialog-actions">
+        <button id="useCurrentLocationButton" class="close-button" type="button" style="margin-right:auto;background:rgba(157,151,245,0.18);">AKTUELLER ORT</button>
         <button id="closeSearchButton" class="close-button" type="button">SCHLIESSEN</button>
       </div>
     </div>
@@ -648,9 +678,11 @@
       radarLayer: null,
       radarTimestamp: null,
       favorites: [],
-      forecastDataByModel: {},
       chartMetrics: null,
       chartHoverIndex: null,
+      pullStartY: null,
+      pullTriggered: false,
+      pullEligible: false,
     };
 
     const els = {
@@ -674,6 +706,7 @@
       searchInput: document.getElementById('searchInput'),
       searchResults: document.getElementById('searchResults'),
       closeSearchButton: document.getElementById('closeSearchButton'),
+      useCurrentLocationButton: document.getElementById('useCurrentLocationButton'),
       toast: document.getElementById('toast'),
       forecastCanvas: document.getElementById('forecastCanvas'),
       chartTooltip: document.getElementById('chartTooltip'),
@@ -702,7 +735,12 @@
     }
 
     function formatDateLong(dateLike) {
-      return new Date(dateLike).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }).toUpperCase();
+      return new Date(dateLike).toLocaleDateString('de-DE', {
+        weekday: 'short',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      }).toUpperCase();
     }
 
     function setStatus(text) {
@@ -738,7 +776,9 @@
     }
 
     function persistCurrentLocation() {
-      if (state.location) localStorage.setItem(STORAGE_KEYS.currentLocation, JSON.stringify(state.location));
+      if (state.location) {
+        localStorage.setItem(STORAGE_KEYS.currentLocation, JSON.stringify(state.location));
+      }
     }
 
     function persistFavorites() {
@@ -810,6 +850,7 @@
       url.searchParams.set('hourly', 'temperature_2m');
       url.searchParams.set('forecast_days', '4');
       url.searchParams.set('timezone', 'auto');
+
       const response = await fetch(url.toString(), { cache: 'no-store' });
       if (!response.ok) {
         const text = await response.text().catch(() => '');
@@ -827,22 +868,31 @@
       url.searchParams.set('current', 'temperature_2m');
       url.searchParams.set('forecast_days', '4');
       url.searchParams.set('timezone', 'auto');
+
       const response = await fetch(url.toString(), { cache: 'no-store' });
       if (!response.ok) throw new Error('Basis-Forecast fehlgeschlagen');
       return response.json();
     }
 
+    function getHourlyStartIndex(times) {
+      const now = Date.now();
+      const idx = times.findIndex(t => new Date(t).getTime() >= now);
+      return idx >= 0 ? idx : 0;
+    }
+
     function extractModelForecast72h(apiData) {
+      const start = getHourlyStartIndex(apiData.hourly.time);
       return {
-        times: apiData.hourly.time.slice(0, 72),
-        temps: apiData.hourly.temperature_2m.slice(0, 72),
+        times: apiData.hourly.time.slice(start, start + 72),
+        temps: apiData.hourly.temperature_2m.slice(start, start + 72),
       };
     }
 
     function extractBaseForecast72h(apiData) {
+      const start = getHourlyStartIndex(apiData.hourly.time);
       return {
-        times: apiData.hourly.time.slice(0, 72),
-        rain: apiData.hourly.precipitation.slice(0, 72),
+        times: apiData.hourly.time.slice(start, start + 72),
+        rain: apiData.hourly.precipitation.slice(start, start + 72),
         currentTemp: apiData.current?.temperature_2m ?? null,
         sunrise: apiData.daily?.sunrise?.[0] ?? null,
         sunset: apiData.daily?.sunset?.[0] ?? null,
@@ -865,7 +915,8 @@
 
       const availableModelKeys = Object.keys(byModel);
       if (!availableModelKeys.length) {
-        const fallbackTemps = baseResult.hourly?.temperature_2m?.slice(0, 72);
+        const start = getHourlyStartIndex(baseResult.hourly?.time || []);
+        const fallbackTemps = baseResult.hourly?.temperature_2m?.slice(start, start + 72);
         if (fallbackTemps && fallbackTemps.length) {
           byModel.ecmwf = { times: base.times, temps: fallbackTemps };
         } else {
@@ -897,11 +948,15 @@
           const response = await fetch(url.toString(), { cache: 'no-store' });
           if (!response.ok) throw new Error();
           const data = await response.json();
-          return { ...favorite, temperature: Math.round(data.current?.temperature_2m ?? data.hourly?.temperature_2m?.[0] ?? 0) };
+          return {
+            ...favorite,
+            temperature: Math.round(data.current?.temperature_2m ?? data.hourly?.temperature_2m?.[0] ?? 0)
+          };
         } catch {
           return { ...favorite, temperature: favorite.temperature ?? null };
         }
       }));
+
       state.favorites = items;
       persistFavorites();
       renderFavorites();
@@ -912,17 +967,26 @@
       state.favorites.slice(0, 4).forEach(favorite => {
         const button = document.createElement('button');
         button.className = 'favorite-card';
-        const isActive = state.location && Math.abs(favorite.latitude - state.location.latitude) < 0.01 && Math.abs(favorite.longitude - state.location.longitude) < 0.01;
+        const isActive = state.location &&
+          Math.abs(favorite.latitude - state.location.latitude) < 0.01 &&
+          Math.abs(favorite.longitude - state.location.longitude) < 0.01;
+
         button.dataset.active = String(isActive);
         button.innerHTML = `
           <span class="favorite-name">${favorite.name}</span>
           <span class="favorite-temp">${favorite.temperature == null ? '--°' : `${favorite.temperature}°`}</span>
         `;
+
         button.addEventListener('click', async () => {
-          state.location = { name: favorite.name, latitude: favorite.latitude, longitude: favorite.longitude };
+          state.location = {
+            name: favorite.name,
+            latitude: favorite.latitude,
+            longitude: favorite.longitude
+          };
           persistCurrentLocation();
           await refreshWeather(true);
         });
+
         els.favoritesGrid.appendChild(button);
       });
     }
@@ -931,8 +995,10 @@
       const canvas = els.forecastCanvas;
       const ratio = Math.max(window.devicePixelRatio || 1, 1);
       const rect = canvas.getBoundingClientRect();
+
       canvas.width = Math.floor(rect.width * ratio);
       canvas.height = Math.floor(rect.height * ratio);
+
       const ctx = canvas.getContext('2d');
       ctx.scale(ratio, ratio);
       ctx.clearRect(0, 0, rect.width, rect.height);
@@ -940,7 +1006,7 @@
       const padding = { top: 24, right: 12, bottom: 38, left: 32 };
       const chartW = rect.width - padding.left - padding.right;
       const chartH = rect.height - padding.top - padding.bottom;
-      const rainZoneHeight = chartH * 0.22;
+      const rainZoneHeight = chartH * 0.28;
       const tempZoneHeight = chartH - rainZoneHeight - 6;
       const times = weather.times;
 
@@ -953,7 +1019,10 @@
       const xForIndex = (i) => padding.left + (i / (times.length - 1)) * chartW;
       const yForTemp = (temp) => padding.top + ((maxTemp - temp) / tempRange) * tempZoneHeight;
       const yRainBase = padding.top + tempZoneHeight + 6 + rainZoneHeight;
-      const yForRainTop = (value) => yRainBase - (value / maxRain) * rainZoneHeight;
+      const yForRainTop = (value) => {
+        const scaled = Math.pow((value || 0) / maxRain, 0.68);
+        return yRainBase - scaled * rainZoneHeight;
+      };
 
       state.chartMetrics = {
         rect,
@@ -987,6 +1056,7 @@
         const x = xForIndex(i);
         const isDayStart = hour === 0;
         const isSixHours = hour % 6 === 0;
+
         if (isSixHours || isDayStart) {
           ctx.strokeStyle = isDayStart ? 'rgba(210, 192, 255, 0.26)' : 'rgba(210, 192, 255, 0.13)';
           ctx.beginPath();
@@ -999,11 +1069,12 @@
 
       ctx.save();
       weather.rain.forEach((value, i) => {
-        const x = xForIndex(i) - Math.max(2, chartW / times.length - 1.5) / 2;
+        const barWidth = Math.max(2, chartW / times.length - 1.5);
+        const x = xForIndex(i) - barWidth / 2;
         const y = yForRainTop(value);
-        const alpha = value >= 1.5 ? 0.75 : value >= 0.5 ? 0.55 : 0.35;
+        const alpha = value >= 2 ? 0.86 : value >= 1 ? 0.68 : value >= 0.3 ? 0.48 : 0.34;
         ctx.fillStyle = `rgba(255,156,47,${alpha})`;
-        ctx.fillRect(x, y, Math.max(2, chartW / times.length - 1.5), Math.max(1, yRainBase - y));
+        ctx.fillRect(x, y, barWidth, Math.max(1, yRainBase - y));
       });
       ctx.restore();
 
@@ -1025,9 +1096,8 @@
         ctx.restore();
       });
 
-      const now = Date.now();
-      const nowIndex = times.findIndex(t => new Date(t).getTime() >= now);
-      if (nowIndex >= 0) {
+      const nowIndex = 0;
+      if (times.length > 0) {
         const x = xForIndex(nowIndex);
         ctx.save();
         ctx.strokeStyle = 'rgba(246,184,140,0.95)';
@@ -1038,10 +1108,6 @@
         ctx.lineTo(x, yRainBase);
         ctx.stroke();
         ctx.setLineDash([]);
-        ctx.fillStyle = 'rgba(246,184,140,0.95)';
-        ctx.font = '10px Oswald';
-        ctx.textAlign = 'center';
-       // ctx.fillText('JETZT', x, padding.top - 8);
         ctx.restore();
 
         MODELS.forEach(model => {
@@ -1063,6 +1129,7 @@
       if (state.chartHoverIndex != null) {
         const i = state.chartHoverIndex;
         const x = xForIndex(i);
+
         ctx.save();
         ctx.strokeStyle = 'rgba(157,151,245,0.95)';
         ctx.lineWidth = 1.2;
@@ -1089,14 +1156,16 @@
       }
 
       ctx.save();
-      ctx.font = '11px Oswald';
+      ctx.font = '12px Oswald';
       ctx.fillStyle = 'rgba(243,212,191,0.85)';
       ctx.textAlign = 'right';
       for (let value = minTemp; value <= maxTemp; value += 4) {
         const y = yForTemp(value);
         ctx.fillText(`${value}°`, padding.left - 6, y + 4);
       }
+
       ctx.textAlign = 'center';
+      ctx.font = '10px Oswald';
       for (let i = 0; i < times.length; i++) {
         const d = new Date(times[i]);
         const hour = d.getHours();
@@ -1104,6 +1173,7 @@
           const x = xForIndex(i);
           ctx.fillStyle = hour === 0 ? 'rgba(157,151,245,0.95)' : 'rgba(243,212,191,0.82)';
           ctx.fillText(`${String(hour).padStart(2, '0')}:00`, x, rect.height - 16);
+
           if (hour === 0) {
             ctx.fillStyle = 'rgba(246,184,140,0.95)';
             ctx.fillText(formatDayDate(d), x + 24, padding.top - 8);
@@ -1116,17 +1186,21 @@
     function updateSummary(weather) {
       els.locationName.textContent = state.location.name;
       els.currentTempNow.textContent = `${Math.round(weather.currentTemp)}°`;
+
       const referenceTemps = weather.byModel.ecmwf?.temps || weather.byModel.icon?.temps || weather.byModel.gfs?.temps || [];
       const rainTotal = weather.rain.reduce((sum, value) => sum + (value || 0), 0);
+
       if (referenceTemps.length) {
         els.metaMin.textContent = `${Math.round(Math.min(...referenceTemps))}°`;
         els.metaMax.textContent = `${Math.round(Math.max(...referenceTemps))}°`;
       }
+
       els.metaRain.textContent = `${rainTotal.toFixed(1)} mm`;
       els.sunriseValue.textContent = `SUNRISE ${weather.sunrise ? formatTime(weather.sunrise) : '--:--'}`;
       els.sunsetValue.textContent = `SUNSET ${weather.sunset ? formatTime(weather.sunset) : '--:--'}`;
       els.sunDate.textContent = weather.sunrise ? formatDateLong(weather.sunrise) : '--';
       els.footerLeft.innerHTML = `LETZTES UPDATE <strong>${state.lastUpdate ? formatTime(state.lastUpdate) : '--:--'}</strong>`;
+
       updateStatusLabel();
       renderFavorites();
       hideChartTooltip();
@@ -1140,33 +1214,52 @@
     }
 
     function initMap() {
-      state.map = L.map('map', { zoomControl: false, attributionControl: false });
+      state.map = L.map('map', {
+        zoomControl: false,
+        attributionControl: false,
+        preferCanvas: true
+      });
+
       state.baseLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
         subdomains: 'abcd',
-        maxZoom: 19,
+        maxZoom: 19
       }).addTo(state.map);
     }
 
     async function updateRadar() {
       if (!state.map || !state.location) return;
+
       state.map.setView([state.location.latitude, state.location.longitude], 8, { animate: false });
+
       try {
         const response = await fetch('https://api.rainviewer.com/public/weather-maps.json', { cache: 'no-store' });
         if (!response.ok) throw new Error('Radar-Metadaten fehlgeschlagen');
+
         const data = await response.json();
         const latest = data.radar?.past?.at(-1) || data.radar?.nowcast?.[0];
         if (!latest) throw new Error('Kein Radarbild verfügbar');
+
         const tileUrl = `https://tilecache.rainviewer.com${latest.path}/256/{z}/{x}/{y}/2/1_1.png`;
+
         if (state.radarLayer) state.map.removeLayer(state.radarLayer);
+
         state.radarLayer = L.tileLayer(tileUrl, {
           tileSize: 256,
           opacity: 0.65,
           zIndex: 10,
+          minZoom: 0,
+          maxZoom: 19,
+          maxNativeZoom: 10,
+          updateWhenZooming: false,
+          keepBuffer: 4,
+          crossOrigin: true
         }).addTo(state.map);
+
         state.radarTimestamp = latest.time * 1000;
         persistRadarMeta(state.radarTimestamp);
         els.radarTime.textContent = `RADAR ${formatTime(state.radarTimestamp)}`;
       } catch (error) {
+        console.error(error);
         els.radarTime.textContent = `RADAR ${state.radarTimestamp ? formatTime(state.radarTimestamp) : '--:--'}`;
         toast('Radar konnte nicht aktualisiert werden');
       }
@@ -1174,6 +1267,7 @@
 
     async function refreshWeather(focusMap = false) {
       if (!state.location) return;
+
       try {
         if (!navigator.onLine && state.weather) {
           state.isOffline = true;
@@ -1182,22 +1276,28 @@
           await updateRadar();
           return;
         }
+
         setStatus('AKTUALISIERE');
         const weather = await fetchWeatherForLocation(state.location);
         state.weather = weather;
         state.lastUpdate = Date.now();
         state.isOffline = false;
+
         persistCache();
         updateSummary(weather);
         await updateFavoriteTemperatures();
         await updateRadar();
-        if (focusMap && state.map) state.map.setView([state.location.latitude, state.location.longitude], 8, { animate: false });
+
+        if (focusMap && state.map) {
+          state.map.setView([state.location.latitude, state.location.longitude], 8, { animate: false });
+        }
       } catch (error) {
         console.error(error);
         const message = error && error.message ? error.message : 'Unbekannter Fehler';
         state.isOffline = !navigator.onLine;
         updateStatusLabel();
         els.footerLeft.innerHTML = `FEHLER <strong>${message.replace(/</g, '&lt;').replace(/>/g, '&gt;').slice(0, 80)}</strong>`;
+
         if (state.weather) {
           updateSummary(state.weather);
           toast(`Fehler: ${message}`);
@@ -1209,6 +1309,7 @@
 
     async function initializeLocation() {
       if (state.location) return;
+
       const detected = await detectLocation();
       if (detected) {
         const named = await reverseGeocode(detected.latitude, detected.longitude);
@@ -1216,6 +1317,7 @@
         persistCurrentLocation();
         return;
       }
+
       state.location = state.favorites[0];
       persistCurrentLocation();
     }
@@ -1225,19 +1327,38 @@
         els.searchDialog.showModal();
         setTimeout(() => els.searchInput.focus(), 50);
       });
+
       els.closeSearchButton.addEventListener('click', () => els.searchDialog.close());
+
+      els.useCurrentLocationButton.addEventListener('click', async () => {
+        const detected = await detectLocation();
+        if (detected) {
+          const named = await reverseGeocode(detected.latitude, detected.longitude);
+          state.location = named || detected;
+          persistCurrentLocation();
+          els.searchDialog.close();
+          await refreshWeather(true);
+        } else {
+          toast('Aktueller Ort nicht verfügbar');
+        }
+      });
+
       els.searchForm.addEventListener('submit', async (event) => {
         event.preventDefault();
         const q = els.searchInput.value.trim();
         if (!q) return;
+
         els.searchResults.innerHTML = '<button type="button">SUCHE LÄUFT...</button>';
+
         try {
           const results = await geocodeLocation(q);
           els.searchResults.innerHTML = '';
+
           if (!results.length) {
             els.searchResults.innerHTML = '<button type="button">KEINE TREFFER</button>';
             return;
           }
+
           results.forEach(result => {
             const button = document.createElement('button');
             button.type = 'button';
@@ -1245,11 +1366,13 @@
             button.addEventListener('click', async () => {
               state.location = result;
               persistCurrentLocation();
+
               const exists = state.favorites.some(f => f.name === result.name);
               if (!exists) {
                 state.favorites = [result, ...state.favorites].slice(0, 4);
                 persistFavorites();
               }
+
               els.searchDialog.close();
               await refreshWeather(true);
             });
@@ -1263,19 +1386,24 @@
 
     function getChartIndexFromEvent(event) {
       if (!state.chartMetrics || !state.weather) return null;
+
       const rect = els.forecastCanvas.getBoundingClientRect();
       const clientX = event.touches?.[0]?.clientX ?? event.clientX;
       const x = clientX - rect.left;
       const { padding, chartW, times } = state.chartMetrics;
+
       if (x < padding.left || x > rect.width - padding.right) return null;
+
       const ratio = (x - padding.left) / chartW;
       return Math.max(0, Math.min(times.length - 1, Math.round(ratio * (times.length - 1))));
     }
 
     function showChartTooltip(index, event) {
       if (!state.weather || index == null) return;
+
       const time = state.weather.times[index];
       const rain = state.weather.rain[index] ?? 0;
+
       const rows = MODELS
         .map(model => {
           const value = state.weather.byModel[model.key]?.temps?.[index];
@@ -1283,16 +1411,20 @@
           return `<div class="tt-row"><span class="tt-label"><span class="tt-dot" style="background:${model.color}"></span>${model.label}</span><strong>${Math.round(value)}°</strong></div>`;
         })
         .join('');
+
       els.chartTooltip.innerHTML = `
         <div class="tt-time">${formatDayDate(time)} ${formatTime(time)}</div>
         ${rows}
         <div class="tt-row"><span class="tt-label">Regen</span><strong>${rain.toFixed(1)} mm</strong></div>
       `;
+
       els.chartTooltip.hidden = false;
+
       const wrapRect = els.forecastCanvas.parentElement.getBoundingClientRect();
       const pointX = (event.touches?.[0]?.clientX ?? event.clientX) - wrapRect.left;
       const tooltipWidth = 156;
       const left = Math.max(8, Math.min(wrapRect.width - tooltipWidth - 8, pointX - tooltipWidth / 2));
+
       els.chartTooltip.style.left = `${left}px`;
       els.chartTooltip.style.top = '8px';
     }
@@ -1304,18 +1436,22 @@
 
     function setupChartInteractions() {
       const wrap = els.forecastCanvas.parentElement;
+
       const onMove = (event) => {
         if (!state.weather) return;
+
         const index = getChartIndexFromEvent(event);
         if (index == null) {
           hideChartTooltip();
           drawForecastChart(state.weather);
           return;
         }
+
         state.chartHoverIndex = index;
         drawForecastChart(state.weather);
         showChartTooltip(index, event);
       };
+
       wrap.addEventListener('pointermove', onMove);
       wrap.addEventListener('pointerdown', onMove);
       wrap.addEventListener('pointerleave', () => {
@@ -1323,6 +1459,7 @@
         hideChartTooltip();
         drawForecastChart(state.weather);
       });
+
       wrap.addEventListener('touchstart', onMove, { passive: true });
       wrap.addEventListener('touchmove', onMove, { passive: true });
       wrap.addEventListener('touchend', () => {
@@ -1334,6 +1471,33 @@
       });
     }
 
+    function setupPullToRefresh() {
+      const app = document.querySelector('.app');
+
+      app.addEventListener('touchstart', (event) => {
+        const y = event.touches[0].clientY;
+        state.pullStartY = y;
+        state.pullTriggered = false;
+        state.pullEligible = y < 140;
+      }, { passive: true });
+
+      app.addEventListener('touchmove', (event) => {
+        if (!state.pullEligible || state.pullStartY == null || state.pullTriggered) return;
+        const deltaY = event.touches[0].clientY - state.pullStartY;
+        if (deltaY > 95) {
+          state.pullTriggered = true;
+          toast('Aktualisiere Wetter');
+          refreshWeather();
+        }
+      }, { passive: true });
+
+      app.addEventListener('touchend', () => {
+        state.pullStartY = null;
+        state.pullTriggered = false;
+        state.pullEligible = false;
+      }, { passive: true });
+    }
+
     function setupNetworkEvents() {
       window.addEventListener('online', async () => {
         state.isOffline = false;
@@ -1341,11 +1505,13 @@
         toast('Wieder online');
         await refreshWeather();
       });
+
       window.addEventListener('offline', () => {
         state.isOffline = true;
         updateStatusLabel();
         toast('Offline');
       });
+
       window.addEventListener('resize', () => {
         if (state.weather) drawForecastChart(state.weather);
       });
@@ -1353,6 +1519,7 @@
 
     async function registerServiceWorker() {
       if (!('serviceWorker' in navigator)) return;
+
       const swCode = `
         const CACHE_NAME = 'lcars-weather-static-v1';
         self.addEventListener('install', event => {
@@ -1374,8 +1541,10 @@
           );
         });
       `;
+
       const blob = new Blob([swCode], { type: 'text/javascript' });
       const url = URL.createObjectURL(blob);
+
       try {
         await navigator.serviceWorker.register(url);
       } catch {}
@@ -1385,12 +1554,17 @@
       loadStoredData();
       updateClock();
       setInterval(updateClock, 1000 * 30);
+
       setupSearch();
       setupNetworkEvents();
+      setupPullToRefresh();
       setupChartInteractions();
+
       initMap();
       renderFavorites();
+
       if (state.weather) updateSummary(state.weather);
+
       await initializeLocation();
       await refreshWeather(true);
       registerServiceWorker();
