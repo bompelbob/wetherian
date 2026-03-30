@@ -60,6 +60,64 @@
       background: #000000;
       touch-action: pan-x;
     }
+    
+.daily-panel {
+  padding: 8px 10px;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+}
+
+.daily-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+  min-height: 0;
+}
+
+.daily-card {
+  min-width: 0;
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(157,151,245,0.10), rgba(255,156,47,0.08));
+  border: 1px solid rgba(255,255,255,0.04);
+  padding: 8px 8px 7px;
+  display: grid;
+  grid-template-rows: auto auto auto auto;
+  justify-items: center;
+  align-items: center;
+  gap: 4px;
+}
+
+.daily-day {
+  color: var(--lcars-apricot);
+  font-size: 0.78rem;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.daily-icon {
+  width: 34px;
+  height: 34px;
+  display: block;
+}
+
+.daily-temp {
+  color: var(--text);
+  font-size: 0.82rem;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.daily-rain {
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+}
 
     .panel {
       background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
@@ -589,6 +647,7 @@
         font-size: 0.86rem;
         padding: 4px 8px;
       }
+      
     }
   </style>
 </head>
@@ -625,18 +684,16 @@
         <canvas id="forecastCanvas"></canvas>
         <div id="chartTooltip" class="chart-tooltip" hidden></div>
       </div>
-      <div class="forecast-meta">
-        <span><strong id="metaMin">--°</strong> MIN</span>
-        <span style="text-align:center"><strong id="metaRain">-- mm</strong></span>
-        <span style="text-align:right"><strong id="metaMax">--°</strong> MAX</span>
-      </div>
+<div class="forecast-meta">
+  <span><strong id="metaMin">--°</strong> MIN 24H</span>
+  <span style="text-align:center"><strong id="metaRain">-- mm</strong> 24H</span>
+  <span style="text-align:right"><strong id="metaMax">--°</strong> MAX 24H</span>
+</div>
     </section>
 
-    <section class="panel sun-panel">
-      <div id="sunriseValue" class="sun-chip">SUNRISE --:--</div>
-      <div id="sunDate" class="sun-date">--</div>
-      <div id="sunsetValue" class="sun-chip" style="text-align:right">SUNSET --:--</div>
-    </section>
+<section class="panel daily-panel">
+  <div id="dailySummary" class="daily-grid"></div>
+</section>
 
     <section class="panel radar-panel">
       <div class="radar-header">
@@ -654,7 +711,8 @@
 
     <section class="panel footer">
       <div id="footerLeft">LETZTES UPDATE <strong>--:--</strong></div>
-      <div id="footerRight">MODELLE <strong>ECMWF ICON GFS</strong></div>
+      <div id="footerRight">SOURCES <strong>OPEN-METEO</strong> • <strong>RAINVIEWER</strong>
+</div>
     </section>
   </main>
 
@@ -739,6 +797,7 @@
       toast: document.getElementById('toast'),
       forecastCanvas: document.getElementById('forecastCanvas'),
       chartTooltip: document.getElementById('chartTooltip'),
+      dailySummary: document.getElementById('dailySummary'),
     };
 
     function installDynamicManifest() {
@@ -932,6 +991,7 @@
       url.searchParams.set('current', 'temperature_2m');
       url.searchParams.set('forecast_days', '4');
       url.searchParams.set('timezone', 'auto');
+      url.searchParams.set('hourly', 'precipitation,temperature_2m,weather_code');
 
       const response = await fetch(url.toString(), { cache: 'no-store' });
       if (!response.ok) throw new Error('Basis-Forecast fehlgeschlagen');
@@ -946,16 +1006,18 @@
       };
     }
 
-    function extractBaseForecast72h(apiData) {
-      const start = getHourlyStartIndex(apiData.hourly.time);
-      return {
-        times: apiData.hourly.time.slice(start, start + 72),
-        rain: apiData.hourly.precipitation.slice(start, start + 72),
-        currentTemp: apiData.current?.temperature_2m ?? null,
-        sunrise: apiData.daily?.sunrise?.[0] ?? null,
-        sunset: apiData.daily?.sunset?.[0] ?? null,
-      };
-    }
+function extractBaseForecast72h(apiData) {
+  const start = getHourlyStartIndex(apiData.hourly.time);
+  return {
+    times: apiData.hourly.time.slice(start, start + 72),
+    rain: apiData.hourly.precipitation.slice(start, start + 72),
+    temps: apiData.hourly.temperature_2m.slice(start, start + 72),
+    weatherCodes: apiData.hourly.weather_code.slice(start, start + 72),
+    currentTemp: apiData.current?.temperature_2m ?? null,
+    sunrise: apiData.daily?.sunrise?.[0] ?? null,
+    sunset: apiData.daily?.sunset?.[0] ?? null,
+  };
+}
 
     async function fetchWeatherForLocation(location) {
       const baseResult = await fetchBaseForecast(location);
@@ -992,6 +1054,8 @@
         times: byModel[referenceKey].times,
         rain: base.rain,
         currentTemp: base.currentTemp ?? byModel[referenceKey].temps[0],
+        temps: base.temps,
+		weatherCodes: base.weatherCodes,
       };
     }
 
@@ -1311,6 +1375,120 @@ extrema.forEach(({ max, min }) => {
       ctx.restore();
     }
 
+function getDayLabel(date, index) {
+  if (index === 0) return 'HEUTE';
+  if (index === 1) return 'MORGEN';
+  return date.toLocaleDateString('de-DE', { weekday: 'short' }).replace('.', '').toUpperCase();
+}
+
+function getDailyWeatherCode(codes) {
+  if (!codes.length) return 3;
+  const middayIndex = Math.min(codes.length - 1, 12);
+  return codes[middayIndex];
+}
+
+function weatherIconSvg(code) {
+  const sun = '#ff9c2f';
+  const cloud = '#9d97f5';
+  const rain = '#f6b88c';
+
+  const sunny = `
+    <svg viewBox="0 0 64 64" class="daily-icon" aria-hidden="true">
+      <circle cx="32" cy="32" r="12" fill="${sun}"/>
+      <rect x="30" y="6" width="4" height="10" rx="2" fill="${sun}"/>
+      <rect x="30" y="48" width="4" height="10" rx="2" fill="${sun}"/>
+      <rect x="48" y="30" width="10" height="4" rx="2" fill="${sun}"/>
+      <rect x="6" y="30" width="10" height="4" rx="2" fill="${sun}"/>
+      <rect x="44.5" y="13" width="4" height="10" rx="2" fill="${sun}" transform="rotate(45 46.5 18)"/>
+      <rect x="15.5" y="42" width="4" height="10" rx="2" fill="${sun}" transform="rotate(45 17.5 47)"/>
+      <rect x="42" y="44.5" width="10" height="4" rx="2" fill="${sun}" transform="rotate(45 47 46.5)"/>
+      <rect x="13" y="15.5" width="10" height="4" rx="2" fill="${sun}" transform="rotate(45 18 17.5)"/>
+    </svg>
+  `;
+
+  const cloudy = `
+    <svg viewBox="0 0 64 64" class="daily-icon" aria-hidden="true">
+      <circle cx="24" cy="30" r="11" fill="${cloud}"/>
+      <circle cx="35" cy="27" r="13" fill="${cloud}"/>
+      <circle cx="45" cy="33" r="10" fill="${cloud}"/>
+      <rect x="16" y="33" width="36" height="12" rx="6" fill="${cloud}"/>
+    </svg>
+  `;
+
+  const partly = `
+    <svg viewBox="0 0 64 64" class="daily-icon" aria-hidden="true">
+      <circle cx="24" cy="24" r="10" fill="${sun}"/>
+      <rect x="22" y="7" width="4" height="8" rx="2" fill="${sun}"/>
+      <rect x="22" y="33" width="4" height="8" rx="2" fill="${sun}"/>
+      <rect x="33" y="22" width="8" height="4" rx="2" fill="${sun}"/>
+      <rect x="7" y="22" width="8" height="4" rx="2" fill="${sun}"/>
+      <circle cx="28" cy="36" r="11" fill="${cloud}"/>
+      <circle cx="39" cy="33" r="13" fill="${cloud}"/>
+      <circle cx="49" cy="39" r="10" fill="${cloud}"/>
+      <rect x="20" y="39" width="36" height="12" rx="6" fill="${cloud}"/>
+    </svg>
+  `;
+
+  const rainy = `
+    <svg viewBox="0 0 64 64" class="daily-icon" aria-hidden="true">
+      <circle cx="24" cy="28" r="11" fill="${cloud}"/>
+      <circle cx="35" cy="25" r="13" fill="${cloud}"/>
+      <circle cx="45" cy="31" r="10" fill="${cloud}"/>
+      <rect x="16" y="31" width="36" height="12" rx="6" fill="${cloud}"/>
+      <rect x="22" y="46" width="4" height="10" rx="2" fill="${rain}"/>
+      <rect x="31" y="46" width="4" height="10" rx="2" fill="${rain}"/>
+      <rect x="40" y="46" width="4" height="10" rx="2" fill="${rain}"/>
+    </svg>
+  `;
+
+  if (code === 0) return sunny;
+  if ([1, 2].includes(code)) return partly;
+  if ([3, 45, 48].includes(code)) return cloudy;
+  if ([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return rainy;
+  return partly;
+}
+
+function renderDailySummary(weather) {
+  if (!els.dailySummary) return;
+
+  const groups = new Map();
+
+  weather.times.forEach((time, i) => {
+    const d = new Date(time);
+    const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    if (!groups.has(key)) {
+      groups.set(key, {
+        date: d,
+        temps: [],
+        rain: [],
+        codes: []
+      });
+    }
+    const entry = groups.get(key);
+    entry.temps.push(weather.temps[i]);
+    entry.rain.push(weather.rain[i]);
+    entry.codes.push(weather.weatherCodes[i]);
+  });
+
+  const days = [...groups.values()].slice(0, 3);
+
+  els.dailySummary.innerHTML = days.map((day, index) => {
+    const min = Math.round(Math.min(...day.temps));
+    const max = Math.round(Math.max(...day.temps));
+    const rain = day.rain.reduce((sum, v) => sum + (v || 0), 0);
+    const code = getDailyWeatherCode(day.codes);
+
+    return `
+      <div class="daily-card">
+        <div class="daily-day">${getDayLabel(day.date, index)}</div>
+        ${weatherIconSvg(code)}
+        <div class="daily-temp">${min}° / ${max}°</div>
+        <div class="daily-rain">${rain.toFixed(1)} MM</div>
+      </div>
+    `;
+  }).join('');
+}
+
 function updateSummary(weather) {
   els.locationName.textContent = state.location.name;
   els.currentTempNow.textContent = `${Math.round(weather.currentTemp)}°`;
@@ -1333,9 +1511,7 @@ function updateSummary(weather) {
   }
 
   els.metaRain.textContent = `${rain24h.toFixed(1)} mm`;
-  els.sunriseValue.textContent = `SUNRISE ${weather.sunrise ? formatTime(weather.sunrise) : '--:--'}`;
-  els.sunsetValue.textContent = `SUNSET ${weather.sunset ? formatTime(weather.sunset) : '--:--'}`;
-  els.sunDate.textContent = weather.sunrise ? formatDateLong(weather.sunrise) : '--';
+  renderDailySummary(weather);
   els.footerLeft.innerHTML = `LETZTES UPDATE <strong>${state.lastUpdate ? formatTime(state.lastUpdate) : '--:--'}</strong>`;
 
   updateStatusLabel();
