@@ -48,6 +48,7 @@
       overflow: hidden;
       letter-spacing: 0.02em;
       overscroll-behavior: none;
+      text-transform: uppercase;
     }
 
     .app {
@@ -56,10 +57,7 @@
       display: grid;
       grid-template-rows: 0.11fr 0.38fr 0.07fr 0.13fr 0.25fr 0.06fr;
       gap: 8px;
-      background:
-        radial-gradient(circle at top right, rgba(157,151,245,0.12), transparent 28%),
-        radial-gradient(circle at bottom left, rgba(255,156,47,0.10), transparent 35%),
-        #000;
+      background: #000000;
       touch-action: pan-x;
     }
 
@@ -1288,7 +1286,7 @@
     async function updateRadar() {
       if (!state.map || !state.location) return;
 
-      state.map.setView([state.location.latitude, state.location.longitude], 6, { animate: false });
+      state.map.setView([state.location.latitude, state.location.longitude], 7, { animate: false });
 
       try {
         const response = await fetch('https://api.rainviewer.com/public/weather-maps.json', { cache: 'no-store' });
@@ -1348,7 +1346,7 @@
         await updateRadar();
 
         if (focusMap && state.map) {
-          state.map.setView([state.location.latitude, state.location.longitude], 6, { animate: false });
+          state.map.setView([state.location.latitude, state.location.longitude], 7, { animate: false });
         }
       } catch (error) {
         console.error(error);
@@ -1442,6 +1440,47 @@
         }
       });
     }
+    
+    function setupPullToRefresh() {
+  const app = document.querySelector('.app');
+
+  let startY = 0;
+  let pulling = false;
+
+  app.addEventListener('touchstart', (e) => {
+    startY = e.touches[0].clientY;
+    pulling = true;
+  }, { passive: true });
+
+  app.addEventListener('touchmove', (e) => {
+    if (!pulling) return;
+
+    const delta = e.touches[0].clientY - startY;
+
+    if (delta > 0) {
+      const limited = Math.min(delta, 120);
+      app.style.transform = `translateY(${limited}px)`;
+    }
+  }, { passive: true });
+
+  app.addEventListener('touchend', async (e) => {
+    const delta = e.changedTouches[0].clientY - startY;
+
+    pulling = false;
+
+    app.style.transition = 'transform 0.2s ease';
+    app.style.transform = 'translateY(0px)';
+
+    setTimeout(() => {
+      app.style.transition = '';
+    }, 200);
+
+    if (delta > 80) {
+      toast('AKTUALISIERE');
+      await refreshWeather();
+    }
+  });
+}
 
     function getChartIndexFromEvent(event) {
       if (!state.chartMetrics || !state.weather) return null;
@@ -1631,6 +1670,7 @@
     }
 
     init();
+    setupPullToRefresh();
   </script>
 </body>
 </html>
