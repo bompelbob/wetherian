@@ -1,6 +1,6 @@
 {
-  "name": "LCARS Weather",
-  "short_name": "Weather",
+  "name": "Wetter",
+  "short_name": "Wetter",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#000000",
