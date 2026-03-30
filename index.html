@@ -1450,12 +1450,17 @@ function weatherIconSvg(code) {
 
 function renderDailySummary(weather) {
   if (!els.dailySummary) return;
+  if (!weather || !weather.times || !weather.temps || !weather.weatherCodes) {
+    els.dailySummary.innerHTML = '';
+    return;
+  }
 
   const groups = new Map();
 
   weather.times.forEach((time, i) => {
     const d = new Date(time);
     const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+
     if (!groups.has(key)) {
       groups.set(key, {
         date: d,
@@ -1464,6 +1469,7 @@ function renderDailySummary(weather) {
         codes: []
       });
     }
+
     const entry = groups.get(key);
     entry.temps.push(weather.temps[i]);
     entry.rain.push(weather.rain[i]);
@@ -1890,8 +1896,6 @@ function updateSummary(weather) {
 
       initMap();
       renderFavorites();
-
-      if (state.weather) updateSummary(state.weather);
 
       await initializeLocation();
       await refreshWeather(true);
