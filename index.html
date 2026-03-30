@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>Wetter</title>
+  <title>LCARS Weather</title>
 
-  <meta name="application-name" content="Wetter" />
+  <meta name="application-name" content="LCARS Weather" />
   <meta name="theme-color" content="#000000" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Wetter" />
+  <meta name="apple-mobile-web-app-title" content="LCARS Weather" />
   <meta name="mobile-web-app-capable" content="yes" />
   <link rel="apple-touch-icon" href="IMG_7958.png" />
 
@@ -368,6 +368,7 @@
       gap: 8px;
       transition: transform 120ms ease, filter 120ms ease;
       overflow: hidden;
+      margin-bottom: 5px;
     }
 
     .favorite-card[data-active="true"] {
@@ -1310,31 +1311,38 @@ extrema.forEach(({ max, min }) => {
       ctx.restore();
     }
 
-    function updateSummary(weather) {
-      els.locationName.textContent = state.location.name;
-      els.currentTempNow.textContent = `${Math.round(weather.currentTemp)}°`;
+function updateSummary(weather) {
+  els.locationName.textContent = state.location.name;
+  els.currentTempNow.textContent = `${Math.round(weather.currentTemp)}°`;
 
-      const referenceTempsFull = weather.byModel.ecmwf?.temps || weather.byModel.icon?.temps || weather.byModel.gfs?.temps || [];
+  const referenceTempsFull =
+    weather.byModel.ecmwf?.temps ||
+    weather.byModel.icon?.temps ||
+    weather.byModel.gfs?.temps ||
+    [];
 
-	  const temps24h = referenceTempsFull.slice(0, 24);
-      const rain24h = weather.rain.slice(0, 24).reduce((sum, value) => sum + (value || 0), 0);
+  const temps24h = referenceTempsFull.slice(0, 24);
+  const rain24h = weather.rain.slice(0, 24).reduce((sum, value) => sum + (value || 0), 0);
 
-      if (referenceTemps.length) {
-        els.metaMin.textContent = `${Math.round(Math.min(...temps24h))}°`;
-        els.metaMax.textContent = `${Math.round(Math.max(...temps24h))}°`;
-      }
+  if (temps24h.length) {
+    els.metaMin.textContent = `${Math.round(Math.min(...temps24h))}°`;
+    els.metaMax.textContent = `${Math.round(Math.max(...temps24h))}°`;
+  } else {
+    els.metaMin.textContent = '--°';
+    els.metaMax.textContent = '--°';
+  }
 
-      els.metaRain.textContent = `${rain24h.toFixed(1)} mm`;
-      els.sunriseValue.textContent = `SUNRISE ${weather.sunrise ? formatTime(weather.sunrise) : '--:--'}`;
-      els.sunsetValue.textContent = `SUNSET ${weather.sunset ? formatTime(weather.sunset) : '--:--'}`;
-      els.sunDate.textContent = weather.sunrise ? formatDateLong(weather.sunrise) : '--';
-      els.footerLeft.innerHTML = `LETZTES UPDATE <strong>${state.lastUpdate ? formatTime(state.lastUpdate) : '--:--'}</strong>`;
+  els.metaRain.textContent = `${rain24h.toFixed(1)} mm`;
+  els.sunriseValue.textContent = `SUNRISE ${weather.sunrise ? formatTime(weather.sunrise) : '--:--'}`;
+  els.sunsetValue.textContent = `SUNSET ${weather.sunset ? formatTime(weather.sunset) : '--:--'}`;
+  els.sunDate.textContent = weather.sunrise ? formatDateLong(weather.sunrise) : '--';
+  els.footerLeft.innerHTML = `LETZTES UPDATE <strong>${state.lastUpdate ? formatTime(state.lastUpdate) : '--:--'}</strong>`;
 
-      updateStatusLabel();
-      renderFavorites();
-      hideChartTooltip();
-      drawForecastChart(weather);
-    }
+  updateStatusLabel();
+  renderFavorites();
+  hideChartTooltip();
+  drawForecastChart(weather);
+}
 
     function updateStatusLabel() {
       if (state.isOffline) setStatus('OFFLINE');
