@@ -746,7 +746,7 @@
     const STORAGE_KEYS = {
       currentLocation: 'lcars-weather-current-location',
       favorites: 'lcars-weather-favorites',
-      cache: 'lcars-weather-cache-v1',
+      cache: 'lcars-weather-cache-v2',
       radarMeta: 'lcars-weather-radar-meta-v1',
     };
 
@@ -773,12 +773,6 @@
       clock: document.getElementById('clock'),
       statusBadge: document.getElementById('statusBadge'),
       currentTempNow: document.getElementById('currentTempNow'),
-      metaMin: document.getElementById('metaMin'),
-      metaMax: document.getElementById('metaMax'),
-      metaRain: document.getElementById('metaRain'),
-      sunriseValue: document.getElementById('sunriseValue'),
-      sunsetValue: document.getElementById('sunsetValue'),
-      sunDate: document.getElementById('sunDate'),
       favoritesGrid: document.getElementById('favoritesGrid'),
       radarTime: document.getElementById('radarTime'),
       footerLeft: document.getElementById('footerLeft'),
@@ -981,7 +975,6 @@
       const url = new URL('https://api.open-meteo.com/v1/forecast');
       url.searchParams.set('latitude', location.latitude);
       url.searchParams.set('longitude', location.longitude);
-      url.searchParams.set('hourly', 'precipitation,temperature_2m');
       url.searchParams.set('daily', 'sunrise,sunset');
       url.searchParams.set('current', 'temperature_2m');
       url.searchParams.set('forecast_days', '4');
@@ -1494,7 +1487,6 @@ function updateSummary(weather) {
   els.locationName.textContent = state.location.name;
   els.currentTempNow.textContent = `${Math.round(weather.currentTemp)}°`;
 
-  els.metaRain.textContent = `${rain24h.toFixed(1)} mm`;
   renderDailySummary(weather);
   els.footerLeft.innerHTML = `LETZTES UPDATE <strong>${state.lastUpdate ? formatTime(state.lastUpdate) : '--:--'}</strong>`;
 
