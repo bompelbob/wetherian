@@ -383,12 +383,12 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-      font-size: 0.8rem;
+      font-size: 0.6rem;
       line-height: 1;
     }
 
     .favorite-temp {
-      font-size: 0.8rem;
+      font-size: 0.6rem;
       line-height: 1;
       white-space: nowrap;
       flex-shrink: 0;
@@ -1177,7 +1177,7 @@ function findDailyExtrema(series, times) {
   return [...days.values()];
 }
 
-function drawTempLabel(x, y, text) {
+function drawTempLabel(x, y, text, position = 'above') {
   const padX = 8;
   const h = 24;
   ctx.save();
@@ -1185,11 +1185,18 @@ function drawTempLabel(x, y, text) {
   const w = ctx.measureText(text).width + padX * 2;
 
   let boxX = x - w / 2;
-  let boxY = y - 34;
+  let boxY = position === 'below' ? y + 10 : y - 34;
 
   if (boxX < padding.left) boxX = padding.left;
   if (boxX + w > rect.width - padding.right) boxX = rect.width - padding.right - w;
-  if (boxY < padding.top) boxY = y + 10;
+
+  if (position === 'above' && boxY < padding.top) {
+    boxY = y + 10;
+  }
+
+  if (position === 'below' && boxY + h > yRainBase - 2) {
+    boxY = y - 34;
+  }
 
   ctx.fillStyle = '#d9cf97';
   ctx.beginPath();
@@ -1208,11 +1215,11 @@ const extrema = findDailyExtrema(labelSeries, times);
 extrema.forEach(({ max, min }) => {
   const maxX = xForIndex(max.index);
   const maxY = yForTemp(max.temp);
-  drawTempLabel(maxX, maxY, `${max.temp.toFixed(1).replace('.', ',')}°`);
+  drawTempLabel(maxX, maxY, `${max.temp.toFixed(1).replace('.', ',')}°`, 'above');
 
   const minX = xForIndex(min.index);
   const minY = yForTemp(min.temp);
-  drawTempLabel(minX, minY, `${min.temp.toFixed(1).replace('.', ',')}°`);
+  drawTempLabel(minX, minY, `${min.temp.toFixed(1).replace('.', ',')}°`, 'below');
 });
 
       const nowIndex = 0;
