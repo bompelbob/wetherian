@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>Wetter</title>
+  <title>LCARS Weather</title>
 
   <meta name="application-name" content="LCARS Weather" />
   <meta name="theme-color" content="#000000" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Wetter" />
+  <meta name="apple-mobile-web-app-title" content="LCARS Weather" />
   <meta name="mobile-web-app-capable" content="yes" />
   <link rel="apple-touch-icon" href="IMG_7958.png" />
 
@@ -388,7 +388,7 @@
     }
 
     .favorite-temp {
-      font-size: 1.14rem;
+      font-size: 0.96rem;
       line-height: 1;
       white-space: nowrap;
       flex-shrink: 0;
@@ -1030,7 +1030,7 @@
 
         button.dataset.active = String(isActive);
         button.innerHTML = `
-          <span class="favorite-name">${favorite.name}</span>
+          <span class="favorite-name">${favorite.name.toUpperCase()}</span>
           <span class="favorite-temp">${favorite.temperature == null ? '--°' : `${favorite.temperature}°`}</span>
         `;
 
@@ -1569,33 +1569,6 @@
       });
     }
 
-    function setupPullToRefresh() {
-      const app = document.querySelector('.app');
-
-      app.addEventListener('touchstart', (event) => {
-        const y = event.touches[0].clientY;
-        state.pullStartY = y;
-        state.pullTriggered = false;
-        state.pullEligible = y < 140;
-      }, { passive: true });
-
-      app.addEventListener('touchmove', (event) => {
-        if (!state.pullEligible || state.pullStartY == null || state.pullTriggered) return;
-        const deltaY = event.touches[0].clientY - state.pullStartY;
-        if (deltaY > 95) {
-          state.pullTriggered = true;
-          toast('Aktualisiere Wetter');
-          refreshWeather();
-        }
-      }, { passive: true });
-
-      app.addEventListener('touchend', () => {
-        state.pullStartY = null;
-        state.pullTriggered = false;
-        state.pullEligible = false;
-      }, { passive: true });
-    }
-
     function setupNetworkEvents() {
       window.addEventListener('online', async () => {
         state.isOffline = false;
@@ -1668,9 +1641,9 @@
       await refreshWeather(true);
       registerServiceWorker();
     }
-
+	
     init();
-    setupPullToRefresh();
+    
   </script>
 </body>
 </html>
