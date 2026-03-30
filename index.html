@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>LCARS Weather</title>
+  <title>Wetter</title>
 
   <meta name="application-name" content="Wetter" />
   <meta name="theme-color" content="#000000" />
@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Wetter" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <link rel="apple-touch-icon" href="icon.png" />
+  <link rel="apple-touch-icon" href="IMG_7958.png" />
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -55,7 +55,7 @@
       height: 100dvh;
       padding: calc(10px + var(--safe-top)) 12px calc(8px + var(--safe-bottom));
       display: grid;
-      grid-template-rows: 0.11fr 0.38fr 0.07fr 0.13fr 0.25fr 0.06fr;
+      grid-template-rows: 0.11fr 0.43fr 0.07fr 0.25fr 0.14fr 0.06fr;
       gap: 8px;
       background: #000000;
       touch-action: pan-x;
@@ -361,7 +361,7 @@
       text-align: left;
       color: #120910;
       background: linear-gradient(90deg, var(--lcars-orange), var(--lcars-apricot));
-      padding: 7px 12px;
+      padding: 12px 12px;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -626,7 +626,7 @@
       </div>
       <div class="forecast-meta">
         <span><strong id="metaMin">--°</strong> MIN</span>
-        <span style="text-align:center"><strong id="metaRain">-- mm</strong> REGEN</span>
+        <span style="text-align:center"><strong id="metaRain">-- mm</strong></span>
         <span style="text-align:right"><strong id="metaMax">--°</strong> MAX</span>
       </div>
     </section>
@@ -637,17 +637,18 @@
       <div id="sunsetValue" class="sun-chip" style="text-align:right">SUNSET --:--</div>
     </section>
 
-    <section class="panel favorites-panel">
-      <div class="section-title">FAVORITEN</div>
-      <div id="favoritesGrid" class="favorites-grid"></div>
-    </section>
-
     <section class="panel radar-panel">
       <div class="radar-header">
         <div class="section-title" style="background:rgba(255,156,47,0.12); color:var(--lcars-orange)">RADAR</div>
         <div id="radarTime" class="radar-time">RADAR --:--</div>
       </div>
       <div class="map-wrap"><div id="map"></div></div>
+    </section>
+    
+    
+    <section class="panel favorites-panel">
+      <div class="section-title">FAVORITEN</div>
+      <div id="favoritesGrid" class="favorites-grid"></div>
     </section>
 
     <section class="panel footer">
@@ -1313,15 +1314,17 @@ extrema.forEach(({ max, min }) => {
       els.locationName.textContent = state.location.name;
       els.currentTempNow.textContent = `${Math.round(weather.currentTemp)}°`;
 
-      const referenceTemps = weather.byModel.ecmwf?.temps || weather.byModel.icon?.temps || weather.byModel.gfs?.temps || [];
-      const rainTotal = weather.rain.reduce((sum, value) => sum + (value || 0), 0);
+      const referenceTempsFull = weather.byModel.ecmwf?.temps || weather.byModel.icon?.temps || weather.byModel.gfs?.temps || [];
+
+	  const temps24h = referenceTempsFull.slice(0, 24);
+      const rain24h = weather.rain.slice(0, 24).reduce((sum, value) => sum + (value || 0), 0);
 
       if (referenceTemps.length) {
-        els.metaMin.textContent = `${Math.round(Math.min(...referenceTemps))}°`;
-        els.metaMax.textContent = `${Math.round(Math.max(...referenceTemps))}°`;
+        els.metaMin.textContent = `${Math.round(Math.min(...temps24h))}°`;
+        els.metaMax.textContent = `${Math.round(Math.max(...temps24h))}°`;
       }
 
-      els.metaRain.textContent = `${rainTotal.toFixed(1)} mm`;
+      els.metaRain.textContent = `${rain24h.toFixed(1)} mm`;
       els.sunriseValue.textContent = `SUNRISE ${weather.sunrise ? formatTime(weather.sunrise) : '--:--'}`;
       els.sunsetValue.textContent = `SUNSET ${weather.sunset ? formatTime(weather.sunset) : '--:--'}`;
       els.sunDate.textContent = weather.sunrise ? formatDateLong(weather.sunrise) : '--';
