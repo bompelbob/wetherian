@@ -981,7 +981,7 @@
       const url = new URL('https://api.open-meteo.com/v1/forecast');
       url.searchParams.set('latitude', location.latitude);
       url.searchParams.set('longitude', location.longitude);
-      url.searchParams.set('daily', 'sunrise,sunset,temperature_2m_min,temperature_2m_max');
+      uurl.searchParams.set('daily', 'sunrise,sunset,temperature_2m_min,temperature_2m_max,precipitation_sum');
       url.searchParams.set('current', 'temperature_2m');
       url.searchParams.set('forecast_days', '4');
       url.searchParams.set('timezone', 'auto');
@@ -1010,10 +1010,9 @@ function extractBaseForecast72h(apiData) {
     currentTemp: apiData.current?.temperature_2m ?? null,
     sunrise: apiData.daily?.sunrise?.[0] ?? null,
     sunset: apiData.daily?.sunset?.[0] ?? null,
-
-    // NEU:
     dailyMin: apiData.daily?.temperature_2m_min || [],
-    dailyMax: apiData.daily?.temperature_2m_max || []
+    dailyMax: apiData.daily?.temperature_2m_max || [],
+    dailyRain: apiData.daily?.precipitation_sum || []
   };
 }
 
@@ -1054,10 +1053,9 @@ return {
   currentTemp: base.currentTemp ?? byModel[referenceKey].temps[0],
   temps: base.temps,
   weatherCodes: base.weatherCodes,
-
-  // NEU:
   dailyMin: base.dailyMin,
-  dailyMax: base.dailyMax
+  dailyMax: base.dailyMax,
+  dailyRain: base.dailyRain
 };
     }
 
@@ -1423,8 +1421,17 @@ if (index === 0 && weather.dailyMin?.length) {
   min = Math.round(Math.min(...day.temps));
   max = Math.round(Math.max(...day.temps));
 }
-    const rain = day.rain.reduce((sum, v) => sum + (v || 0), 0);
-    const code = getDailyWeatherCode(day.codes);
+let min, max, rain;
+
+if (index === 0 && weather.dailyMin?.length) {
+  min = Math.round(weather.dailyMin[0]);
+  max = Math.round(weather.dailyMax[0]);
+  rain = weather.dailyRain?.length ? weather.dailyRain[0] : day.rain.reduce((sum, v) => sum + (v || 0), 0);
+} else {
+  min = Math.round(Math.min(...day.temps));
+  max = Math.round(Math.max(...day.temps));
+  rain = day.rain.reduce((sum, v) => sum + (v || 0), 0);
+}
 
     return `
       <div class="daily-card">
