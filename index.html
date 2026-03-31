@@ -981,7 +981,7 @@
       const url = new URL('https://api.open-meteo.com/v1/forecast');
       url.searchParams.set('latitude', location.latitude);
       url.searchParams.set('longitude', location.longitude);
-      url.searchParams.set('daily', 'sunrise,sunset');
+      url.searchParams.set('daily', 'sunrise,sunset,temperature_2m_min,temperature_2m_max');
       url.searchParams.set('current', 'temperature_2m');
       url.searchParams.set('forecast_days', '4');
       url.searchParams.set('timezone', 'auto');
@@ -1010,6 +1010,10 @@ function extractBaseForecast72h(apiData) {
     currentTemp: apiData.current?.temperature_2m ?? null,
     sunrise: apiData.daily?.sunrise?.[0] ?? null,
     sunset: apiData.daily?.sunset?.[0] ?? null,
+
+    // NEU:
+    dailyMin: apiData.daily?.temperature_2m_min || [],
+    dailyMax: apiData.daily?.temperature_2m_max || []
   };
 }
 
@@ -1040,17 +1044,21 @@ function extractBaseForecast72h(apiData) {
 
       const referenceKey = byModel.ecmwf ? 'ecmwf' : Object.keys(byModel)[0];
 
-      return {
-        location,
-        byModel,
-        sunrise: base.sunrise,
-        sunset: base.sunset,
-        times: byModel[referenceKey].times,
-        rain: base.rain,
-        currentTemp: base.currentTemp ?? byModel[referenceKey].temps[0],
-        temps: base.temps,
-		weatherCodes: base.weatherCodes,
-      };
+return {
+  location,
+  byModel,
+  sunrise: base.sunrise,
+  sunset: base.sunset,
+  times: byModel[referenceKey].times,
+  rain: base.rain,
+  currentTemp: base.currentTemp ?? byModel[referenceKey].temps[0],
+  temps: base.temps,
+  weatherCodes: base.weatherCodes,
+
+  // NEU:
+  dailyMin: base.dailyMin,
+  dailyMax: base.dailyMax
+};
     }
 
     async function updateFavoriteTemperatures() {
@@ -1404,8 +1412,17 @@ function renderDailySummary(weather) {
   const days = [...groups.values()].slice(0, 4);
 
   els.dailySummary.innerHTML = days.map((day, index) => {
-    const min = Math.round(Math.min(...day.temps));
-    const max = Math.round(Math.max(...day.temps));
+let min, max;
+
+if (index === 0 && weather.dailyMin?.length) {
+  // HEUTE → kompletter Tageswert
+  min = Math.round(weather.dailyMin[0]);
+  max = Math.round(weather.dailyMax[0]);
+} else {
+  // Rest wie bisher
+  min = Math.round(Math.min(...day.temps));
+  max = Math.round(Math.max(...day.temps));
+}
     const rain = day.rain.reduce((sum, v) => sum + (v || 0), 0);
     const code = getDailyWeatherCode(day.codes);
 
