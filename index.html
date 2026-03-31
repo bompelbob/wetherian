@@ -1551,6 +1551,10 @@ function wait(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function wait(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 async function closeSearchAndStabilizeViewport() {
   try {
     els.searchInput.blur();
@@ -1561,14 +1565,17 @@ async function closeSearchAndStabilizeViewport() {
   await wait(50);
   updateAppHeight();
 
-  await wait(120);
+  await wait(150);
   updateAppHeight();
 
-  await wait(250);
+  await wait(300);
+  updateAppHeight();
+
+  await wait(600);
   updateAppHeight();
 
   scheduleRelayout();
-}	  
+}  
 
     function setupSearch() {
 
@@ -1787,12 +1794,16 @@ function setupNetworkEvents() {
   });
 
   window.addEventListener('orientationchange', () => {
-    setTimeout(relayoutApp, 50);
-    setTimeout(relayoutApp, 250);
+    updateAppHeight(true);
+    setTimeout(() => updateAppHeight(true), 100);
+    setTimeout(relayoutApp, 150);
+    setTimeout(relayoutApp, 350);
   });
 
   if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', relayoutApp);
+    window.visualViewport.addEventListener('resize', () => {
+      relayoutApp();
+    });
   }
 }
 
@@ -1829,9 +1840,31 @@ function setupNetworkEvents() {
       } catch {}
     }
 
-function updateAppHeight() {
-  const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-  document.documentElement.style.setProperty('--app-height', `${Math.round(vh)}px`);
+let maxAppHeight = 0;
+let lastOrientation = '';
+
+function getOrientationKey() {
+  return window.innerWidth > window.innerHeight ? 'landscape' : 'portrait';
+}
+
+function getViewportHeight() {
+  return Math.round(
+    window.visualViewport ? window.visualViewport.height : window.innerHeight
+  );
+}
+
+function updateAppHeight(forceReset = false) {
+  const orientation = getOrientationKey();
+  const vh = getViewportHeight();
+
+  if (forceReset || orientation !== lastOrientation) {
+    lastOrientation = orientation;
+    maxAppHeight = vh;
+  } else {
+    maxAppHeight = Math.max(maxAppHeight, vh);
+  }
+
+  document.documentElement.style.setProperty('--app-height', `${maxAppHeight}px`);
 }
 
 function relayoutApp() {
