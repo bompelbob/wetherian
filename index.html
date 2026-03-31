@@ -776,7 +776,6 @@
       openSearchButton: document.getElementById('openSearchButton'),
       clock: document.getElementById('clock'),
       statusBadge: document.getElementById('statusBadge'),
-      currentTempNow: document.getElementById('currentTempNow'),
       favoritesGrid: document.getElementById('favoritesGrid'),
       radarTime: document.getElementById('radarTime'),
       footerLeft: document.getElementById('footerLeft'),
@@ -981,7 +980,7 @@
       const url = new URL('https://api.open-meteo.com/v1/forecast');
       url.searchParams.set('latitude', location.latitude);
       url.searchParams.set('longitude', location.longitude);
-      uurl.searchParams.set('daily', 'sunrise,sunset,temperature_2m_min,temperature_2m_max,precipitation_sum');
+      url.searchParams.set('daily', 'sunrise,sunset,temperature_2m_min,temperature_2m_max,precipitation_sum');
       url.searchParams.set('current', 'temperature_2m');
       url.searchParams.set('forecast_days', '4');
       url.searchParams.set('timezone', 'auto');
@@ -1410,28 +1409,21 @@ function renderDailySummary(weather) {
   const days = [...groups.values()].slice(0, 4);
 
   els.dailySummary.innerHTML = days.map((day, index) => {
-let min, max;
+    let min, max, rain;
 
-if (index === 0 && weather.dailyMin?.length) {
-  // HEUTE → kompletter Tageswert
-  min = Math.round(weather.dailyMin[0]);
-  max = Math.round(weather.dailyMax[0]);
-} else {
-  // Rest wie bisher
-  min = Math.round(Math.min(...day.temps));
-  max = Math.round(Math.max(...day.temps));
-}
-let min, max, rain;
+    if (index === 0 && weather.dailyMin?.length) {
+      min = Math.round(weather.dailyMin[0]);
+      max = Math.round(weather.dailyMax[0]);
+      rain = weather.dailyRain?.length
+        ? weather.dailyRain[0]
+        : day.rain.reduce((sum, v) => sum + (v || 0), 0);
+    } else {
+      min = Math.round(Math.min(...day.temps));
+      max = Math.round(Math.max(...day.temps));
+      rain = day.rain.reduce((sum, v) => sum + (v || 0), 0);
+    }
 
-if (index === 0 && weather.dailyMin?.length) {
-  min = Math.round(weather.dailyMin[0]);
-  max = Math.round(weather.dailyMax[0]);
-  rain = weather.dailyRain?.length ? weather.dailyRain[0] : day.rain.reduce((sum, v) => sum + (v || 0), 0);
-} else {
-  min = Math.round(Math.min(...day.temps));
-  max = Math.round(Math.max(...day.temps));
-  rain = day.rain.reduce((sum, v) => sum + (v || 0), 0);
-}
+    const code = getDailyWeatherCode(day.codes);
 
     return `
       <div class="daily-card">
