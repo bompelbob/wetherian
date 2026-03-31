@@ -1547,23 +1547,48 @@ function updateSummary(weather) {
       persistCurrentLocation();
     }
 
+function wait(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function closeSearchAndStabilizeViewport() {
+  try {
+    els.searchInput.blur();
+  } catch {}
+
+  els.searchDialog.close();
+
+  await wait(50);
+  updateAppHeight();
+
+  await wait(120);
+  updateAppHeight();
+
+  await wait(250);
+  updateAppHeight();
+
+  scheduleRelayout();
+}	  
+
     function setupSearch() {
+
+		els.searchDialog.addEventListener('close', () => {
+  scheduleRelayout();
+});
   els.openSearchButton.addEventListener('click', () => {
     els.searchDialog.showModal();
     setTimeout(() => els.searchInput.focus(), 50);
   });
 
   els.closeSearchButton.addEventListener('click', () => els.searchDialog.close());
-
 els.useCurrentLocationButton.addEventListener('click', async () => {
   const detected = await detectLocation();
   if (detected) {
     const named = await reverseGeocode(detected.latitude, detected.longitude);
     state.location = named || detected;
     persistCurrentLocation();
-    els.searchDialog.close();
 
-    scheduleRelayout();
+    await closeSearchAndStabilizeViewport();
     await refreshWeather(true);
     scheduleRelayout();
   } else {
@@ -1593,21 +1618,19 @@ els.useCurrentLocationButton.addEventListener('click', async () => {
         button.textContent = result.name;
 
         button.addEventListener('click', async () => {
-          state.location = result;
-          persistCurrentLocation();
+  state.location = result;
+  persistCurrentLocation();
 
-          const exists = state.favorites.some(f => f.name === result.name);
-          if (!exists) {
-            state.favorites = [result, ...state.favorites].slice(0, 4);
-            persistFavorites();
-          }
+  const exists = state.favorites.some(f => f.name === result.name);
+  if (!exists) {
+    state.favorites = [result, ...state.favorites].slice(0, 4);
+    persistFavorites();
+  }
 
-          els.searchDialog.close();
-
-          scheduleRelayout();
-          await refreshWeather(true);
-          scheduleRelayout();
-        });
+  await closeSearchAndStabilizeViewport();
+  await refreshWeather(true);
+  scheduleRelayout();
+});
 
         els.searchResults.appendChild(button);
       });
@@ -1829,7 +1852,8 @@ function scheduleRelayout() {
   setTimeout(relayoutApp, 80);
   setTimeout(relayoutApp, 220);
   setTimeout(relayoutApp, 500);
-}	  
+  setTimeout(relayoutApp, 900);
+}  
 
 async function init() {
   installDynamicManifest();
