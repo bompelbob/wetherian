@@ -2,93 +2,60 @@
 
 Eine persönliche Wetter-Web-App im reduzierten LCARS-Look.
 
-Die App zeigt eine 72-Stunden-Prognose mit mehreren Wettermodellen, eine kompakte Tagesübersicht für die nächsten Tage, Regenradar, Favoritenorte und eine einfache Standortwahl. Sie ist für die Nutzung auf dem iPhone als PWA gedacht und funktioniert komplett clientseitig.
+Die App zeigt eine 72-Stunden-Prognose mit mehreren Wettermodellen, eine kompakte Tagesübersicht, Regenradar, Favoritenorte und eine einfache Standortwahl. Sie ist für die Nutzung auf dem iPhone als PWA gedacht und funktioniert komplett clientseitig.
 
 ## FEATURES
 
 - 72-STUNDEN-DIAGRAMM
-  - Temperaturkurven von ECMWF, ICON und GFS
-  - Niederschlagsbalken im Diagramm
-  - interaktiver Tooltip per Touch
-  - Tageswechsel und Zeitraster
-
 - TAGESÜBERSICHT
-  - kompakte Vorschau für die nächsten Tage
-  - Wettericons
-  - Min- und Max-Temperaturen
-  - Niederschlagsmenge pro Tag
-
 - RADAR
-  - aktuelles Regenradar auf Karte
-  - zentriert auf den gewählten Ort
+- ORTE & FAVORITEN
+- PWA (Homescreen, Offline-Cache)
 
-- ORTE
-  - Ortssuche
-  - aktueller Standort per Geolocation
-  - Favoriten mit aktueller Temperatur
+## DATENQUELLEN & LIZENZEN
 
-- PWA
-  - Homescreen-fähig
-  - Fullscreen-Nutzung auf iPhone
-  - einfacher Offline-Fallback über Cache
+Diese App verwendet externe Daten- und Kartendienste. Es gelten die jeweiligen Lizenzbedingungen der Anbieter:
 
-## VERWENDETE DATENQUELLEN
+### Wetterdaten
+- OPEN-METEO  
+  https://open-meteo.com/  
+  Nutzung gemäß deren API- und Lizenzbedingungen.
 
-- Wetterdaten: OPEN-METEO
-- Radar: RAINVIEWER
-- Karte: LEAFLET mit Basemap von CARTO
+### Radar
+- RAINVIEWER  
+  https://www.rainviewer.com/api.html  
+  Nutzung gemäß deren API- und Lizenzbedingungen.
+
+### Karten
+- LEAFLET (JavaScript Library)  
+  https://leafletjs.com/  
+  Lizenz: BSD-2-Clause
+
+- CARTO Basemaps  
+  https://carto.com/attributions  
+  © OpenStreetMap contributors © CARTO  
+  Nutzung gemäß den jeweiligen Nutzungsbedingungen.
 
 ## TECHNIK
 
-- HTML
-- CSS
-- Vanilla JavaScript
+- HTML / CSS / JavaScript
 - Leaflet
-- Open-Meteo API
-- RainViewer Radar Tiles
-- LocalStorage
 - Service Worker
-
-## PROJEKTZIEL
-
-Das Projekt ist als persönliche, schnelle und lesbare Wetter-App gedacht.
-
-Der Fokus liegt auf:
-
-- klarer Darstellung
-- schneller Benutzung
-- keinem Login
-- keinem Tracking
-- keiner Werbung
-- keinem Abo
+- LocalStorage
 
 ## INSTALLATION
-
-### Lokal testen
 
 ```bash
 python3 -m http.server 8000
 ```
 
-Dann im Browser öffnen:
+Dann öffnen:
 
 http://localhost:8000
 
-## NUTZUNG ALS PWA AUF DEM IPHONE
+## HINWEIS
 
-1. Seite in Safari öffnen
-2. Teilen-Menü öffnen
-3. „Zum Home-Bildschirm“ wählen
-4. App starten
-
-## CACHING
-
-Die App speichert lokal:
-
-- aktuellen Ort
-- Favoriten
-- zuletzt geladene Wetterdaten
-- Radarzeitstempel
+Diese App wird ohne Gewähr bereitgestellt. Für die Richtigkeit, Verfügbarkeit und Aktualität der Wetter- und Radardaten wird keine Haftung übernommen.
 
 ## AUTOR
 
