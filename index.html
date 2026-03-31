@@ -675,15 +675,15 @@
     </section>
 
     <section class="panel forecast-panel">
-      <div class="forecast-top">
-        <div class="forecast-title">72 STUNDEN</div>
-        <div class="model-legend">
-          <span class="legend-item"><span class="legend-dot" style="background:#f6b88c"></span>ECMWF</span>
-          <span class="legend-item"><span class="legend-dot" style="background:#ff9c2f"></span>ICON</span>
-          <span class="legend-item"><span class="legend-dot" style="background:#9d97f5"></span>GFS</span>
-        </div>
-        <div id="currentTempNow" class="forecast-title">--°</div>
-      </div>
+<div class="forecast-top">
+  <div id="currentTempNow" class="forecast-title">--°</div>
+  <div class="model-legend">
+    <span class="legend-item"><span class="legend-dot" style="background:#f6b88c"></span>ECMWF</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#ff9c2f"></span>ICON</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#9d97f5"></span>GFS</span>
+  </div>
+  <div id="refreshButton" class="forecast-title" style="cursor:pointer">REFRESH</div>
+</div>
       <div class="forecast-canvas-wrap">
         <canvas id="forecastCanvas"></canvas>
         <div id="chartTooltip" class="chart-tooltip" hidden></div>
@@ -791,6 +791,8 @@
       forecastCanvas: document.getElementById('forecastCanvas'),
       chartTooltip: document.getElementById('chartTooltip'),
       dailySummary: document.getElementById('dailySummary'),
+      currentTempNow: document.getElementById('currentTempNow'),
+      refreshButton: document.getElementById('refreshButton'),
     };
 
     function installDynamicManifest() {
@@ -1646,47 +1648,6 @@ els.useCurrentLocationButton.addEventListener('click', async () => {
     }
   });
 }
-    
-    function setupPullToRefresh() {
-  const app = document.querySelector('.app');
-
-  let startY = 0;
-  let pulling = false;
-
-  app.addEventListener('touchstart', (e) => {
-    startY = e.touches[0].clientY;
-    pulling = true;
-  }, { passive: true });
-
-  app.addEventListener('touchmove', (e) => {
-    if (!pulling) return;
-
-    const delta = e.touches[0].clientY - startY;
-
-    if (delta > 0) {
-      const limited = Math.min(delta, 120);
-      app.style.transform = `translateY(${limited}px)`;
-    }
-  }, { passive: true });
-
-  app.addEventListener('touchend', async (e) => {
-    const delta = e.changedTouches[0].clientY - startY;
-
-    pulling = false;
-
-    app.style.transition = 'transform 0.2s ease';
-    app.style.transform = 'translateY(0px)';
-
-    setTimeout(() => {
-      app.style.transition = '';
-    }, 200);
-
-    if (delta > 80) {
-      toast('AKTUALISIERE');
-      await refreshWeather();
-    }
-  });
-}
 
     function getChartIndexFromEvent(event) {
       if (!state.chartMetrics || !state.weather) return null;
@@ -1897,8 +1858,12 @@ async function init() {
 
   setupSearch();
   setupNetworkEvents();
-  setupPullToRefresh();
   setupChartInteractions();
+
+	els.refreshButton.addEventListener('click', async () => {
+  toast('AKTUALISIERE');
+  await refreshWeather(true);
+});
 
   initMap();
   renderFavorites();
