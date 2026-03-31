@@ -1511,7 +1511,7 @@ function updateSummary(weather) {
         updateSummary(weather);
         await updateFavoriteTemperatures();
         await updateRadar();
-		relayoutApp();  
+        scheduleRelayout();
 
         if (focusMap && state.map) {
           state.map.setView([state.location.latitude, state.location.longitude], 7, { animate: false });
@@ -1548,66 +1548,74 @@ function updateSummary(weather) {
     }
 
     function setupSearch() {
-      els.openSearchButton.addEventListener('click', () => {
-        els.searchDialog.showModal();
-        setTimeout(() => els.searchInput.focus(), 50);
-      });
+  els.openSearchButton.addEventListener('click', () => {
+    els.searchDialog.showModal();
+    setTimeout(() => els.searchInput.focus(), 50);
+  });
 
-      els.closeSearchButton.addEventListener('click', () => els.searchDialog.close());
+  els.closeSearchButton.addEventListener('click', () => els.searchDialog.close());
 
-      els.useCurrentLocationButton.addEventListener('click', async () => {
-        const detected = await detectLocation();
-        if (detected) {
-          const named = await reverseGeocode(detected.latitude, detected.longitude);
-          state.location = named || detected;
+els.useCurrentLocationButton.addEventListener('click', async () => {
+  const detected = await detectLocation();
+  if (detected) {
+    const named = await reverseGeocode(detected.latitude, detected.longitude);
+    state.location = named || detected;
+    persistCurrentLocation();
+    els.searchDialog.close();
+
+    scheduleRelayout();
+    await refreshWeather(true);
+    scheduleRelayout();
+  } else {
+    toast('Aktueller Ort nicht verfügbar');
+  }
+});
+
+  els.searchForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const q = els.searchInput.value.trim();
+    if (!q) return;
+
+    els.searchResults.innerHTML = '<button type="button">SUCHE LÄUFT...</button>';
+
+    try {
+      const results = await geocodeLocation(q);
+      els.searchResults.innerHTML = '';
+
+      if (!results.length) {
+        els.searchResults.innerHTML = '<button type="button">KEINE TREFFER</button>';
+        return;
+      }
+
+      results.forEach(result => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = result.name;
+
+        button.addEventListener('click', async () => {
+          state.location = result;
           persistCurrentLocation();
-          els.searchDialog.close();
-          await refreshWeather(true);
-        } else {
-          toast('Aktueller Ort nicht verfügbar');
-        }
-      });
 
-      els.searchForm.addEventListener('submit', async (event) => {
-        event.preventDefault();
-        const q = els.searchInput.value.trim();
-        if (!q) return;
-
-        els.searchResults.innerHTML = '<button type="button">SUCHE LÄUFT...</button>';
-
-        try {
-          const results = await geocodeLocation(q);
-          els.searchResults.innerHTML = '';
-
-          if (!results.length) {
-            els.searchResults.innerHTML = '<button type="button">KEINE TREFFER</button>';
-            return;
+          const exists = state.favorites.some(f => f.name === result.name);
+          if (!exists) {
+            state.favorites = [result, ...state.favorites].slice(0, 4);
+            persistFavorites();
           }
 
-          results.forEach(result => {
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.textContent = result.name;
-            button.addEventListener('click', async () => {
-              state.location = result;
-              persistCurrentLocation();
+          els.searchDialog.close();
 
-              const exists = state.favorites.some(f => f.name === result.name);
-              if (!exists) {
-                state.favorites = [result, ...state.favorites].slice(0, 4);
-                persistFavorites();
-              }
+          scheduleRelayout();
+          await refreshWeather(true);
+          scheduleRelayout();
+        });
 
-              els.searchDialog.close();
-              await refreshWeather(true);
-            });
-            els.searchResults.appendChild(button);
-          });
-        } catch {
-          els.searchResults.innerHTML = '<button type="button">SUCHE FEHLGESCHLAGEN</button>';
-        }
+        els.searchResults.appendChild(button);
       });
+    } catch {
+      els.searchResults.innerHTML = '<button type="button">SUCHE FEHLGESCHLAGEN</button>';
     }
+  });
+}
     
     function setupPullToRefresh() {
   const app = document.querySelector('.app');
@@ -1814,6 +1822,13 @@ function relayoutApp() {
   if (state.map) {
     state.map.invalidateSize();
   }
+}
+
+function scheduleRelayout() {
+  requestAnimationFrame(relayoutApp);
+  setTimeout(relayoutApp, 80);
+  setTimeout(relayoutApp, 220);
+  setTimeout(relayoutApp, 500);
 }	  
 
 async function init() {
