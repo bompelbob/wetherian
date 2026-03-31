@@ -53,6 +53,7 @@
 
 .app {
   height: var(--app-height, 100vh);
+  min-height: var(--app-height, 100vh);
   padding: calc(10px + var(--safe-top)) 12px calc(8px + var(--safe-bottom));
   display: grid;
   grid-template-rows: 0.11fr 0.38fr 0.17fr 0.24fr 0.14fr 0.02fr;
@@ -1510,6 +1511,7 @@ function updateSummary(weather) {
         updateSummary(weather);
         await updateFavoriteTemperatures();
         await updateRadar();
+		relayoutApp();  
 
         if (focusMap && state.map) {
           state.map.setView([state.location.latitude, state.location.longitude], 7, { animate: false });
@@ -1735,25 +1737,33 @@ function updateSummary(weather) {
       });
     }
 
-    function setupNetworkEvents() {
-      window.addEventListener('online', async () => {
-        state.isOffline = false;
-        updateStatusLabel();
-        toast('Wieder online');
-        await refreshWeather();
-      });
+function setupNetworkEvents() {
+  window.addEventListener('online', async () => {
+    state.isOffline = false;
+    updateStatusLabel();
+    toast('Wieder online');
+    await refreshWeather();
+  });
 
-      window.addEventListener('offline', () => {
-        state.isOffline = true;
-        updateStatusLabel();
-        toast('Offline');
-      });
+  window.addEventListener('offline', () => {
+    state.isOffline = true;
+    updateStatusLabel();
+    toast('Offline');
+  });
 
-      window.addEventListener('resize', () => {
-		updateAppHeight();  
-        if (state.weather) drawForecastChart(state.weather);
-      });
-    }
+  window.addEventListener('resize', () => {
+    relayoutApp();
+  });
+
+  window.addEventListener('orientationchange', () => {
+    setTimeout(relayoutApp, 50);
+    setTimeout(relayoutApp, 250);
+  });
+
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', relayoutApp);
+  }
+}
 
     async function registerServiceWorker() {
       if (!('serviceWorker' in navigator)) return;
@@ -1789,38 +1799,47 @@ function updateSummary(weather) {
     }
 
 function updateAppHeight() {
-  const vh = window.innerHeight;
-  document.documentElement.style.setProperty('--app-height', `${vh}px`);
+  const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  document.documentElement.style.setProperty('--app-height', `${Math.round(vh)}px`);
 }
 
-    async function init() {
-      installDynamicManifest();
-	  updateAppHeight();
-      loadStoredData();
-      updateClock();
-      setInterval(updateClock, 1000 * 30);
-
-      setupSearch();
-      setupNetworkEvents();
-      setupPullToRefresh();
-      setupChartInteractions();
-
-      initMap();
-      renderFavorites();
-	  requestAnimationFrame(() => {
-      renderFavorites();
-      });
-
-      await initializeLocation();
-      await refreshWeather(true);
-		setTimeout(() => {
+function relayoutApp() {
   updateAppHeight();
   renderFavorites();
-  if (state.weather) drawForecastChart(state.weather);
-  if (state.map) state.map.invalidateSize();
-}, 100);
-      registerServiceWorker();
-    }
+
+  if (state.weather) {
+    drawForecastChart(state.weather);
+  }
+
+  if (state.map) {
+    state.map.invalidateSize();
+  }
+}	  
+
+async function init() {
+  installDynamicManifest();
+  updateAppHeight();
+  loadStoredData();
+  updateClock();
+  setInterval(updateClock, 1000 * 30);
+
+  setupSearch();
+  setupNetworkEvents();
+  setupPullToRefresh();
+  setupChartInteractions();
+
+  initMap();
+  renderFavorites();
+
+  await initializeLocation();
+  await refreshWeather(true);
+
+  requestAnimationFrame(relayoutApp);
+  setTimeout(relayoutApp, 100);
+  setTimeout(relayoutApp, 400);
+
+  registerServiceWorker();
+}
 	
     init();
     
