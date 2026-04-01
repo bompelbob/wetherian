@@ -774,7 +774,6 @@
     const els = {
       locationName: document.getElementById('locationName'),
       openSearchButton: document.getElementById('openSearchButton'),
-      clock: document.getElementById('clock'),
       statusBadge: document.getElementById('statusBadge'),
       favoritesGrid: document.getElementById('favoritesGrid'),
       radarTime: document.getElementById('radarTime'),
@@ -1570,10 +1569,6 @@ function wait(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function wait(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
 async function closeSearchAndStabilizeViewport() {
   try {
     els.searchInput.blur();
@@ -1870,17 +1865,11 @@ async function init() {
   installDynamicManifest();
   updateAppHeight();
   loadStoredData();
-  updateClock();
   setInterval(updateClock, 1000 * 30);
 
   setupSearch();
   setupNetworkEvents();
   setupChartInteractions();
-
-	els.refreshButton.addEventListener('click', async () => {
-  toast('AKTUALISIERE');
-  await refreshWeather(true);
-});
 
 	els.refreshButton.addEventListener('click', async () => {
   toast('AKTUALISIERE');
