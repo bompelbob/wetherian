@@ -858,34 +858,39 @@
       els.statusBadge.textContent = text;
     }
 
-    function loadStoredData() {
-      const favoritesRaw = localStorage.getItem(STORAGE_KEYS.favorites);
-      state.favorites = favoritesRaw ? JSON.parse(favoritesRaw) : DEFAULT_FAVORITES;
+function loadStoredData() {
+  try {
+    const favoritesRaw = localStorage.getItem(STORAGE_KEYS.favorites);
+    state.favorites = favoritesRaw ? JSON.parse(favoritesRaw) : DEFAULT_FAVORITES;
+  } catch {
+    state.favorites = DEFAULT_FAVORITES;
+  }
 
-      const currentRaw = localStorage.getItem(STORAGE_KEYS.currentLocation);
-      if (currentRaw) state.location = JSON.parse(currentRaw);
+  try {
+    const currentRaw = localStorage.getItem(STORAGE_KEYS.currentLocation);
+    if (currentRaw) state.location = JSON.parse(currentRaw);
+  } catch {}
 
-      const cacheRaw = localStorage.getItem(STORAGE_KEYS.cache);
-      if (cacheRaw) {
-        try {
-          const cached = JSON.parse(cacheRaw);
-          if (cached.location && cached.weather) {
-            state.location = state.location || cached.location;
-            state.weather = cached.weather;
-            state.lastUpdate = cached.lastUpdate || null;
-          }
-        } catch {}
-      }
-
-      const radarMetaRaw = localStorage.getItem(STORAGE_KEYS.radarMeta);
-      if (radarMetaRaw) {
-        try {
-          const parsed = JSON.parse(radarMetaRaw);
-          state.radarTimestamp = parsed.timestamp || null;
-        } catch {}
+  try {
+    const cacheRaw = localStorage.getItem(STORAGE_KEYS.cache);
+    if (cacheRaw) {
+      const cached = JSON.parse(cacheRaw);
+      if (cached.location && cached.weather) {
+        state.location = state.location || cached.location;
+        state.weather = cached.weather;
+        state.lastUpdate = cached.lastUpdate || null;
       }
     }
+  } catch {}
 
+  try {
+    const radarMetaRaw = localStorage.getItem(STORAGE_KEYS.radarMeta);
+    if (radarMetaRaw) {
+      const parsed = JSON.parse(radarMetaRaw);
+      state.radarTimestamp = parsed.timestamp || null;
+    }
+  } catch {}
+}
     function persistCurrentLocation() {
       if (state.location) {
         localStorage.setItem(STORAGE_KEYS.currentLocation, JSON.stringify(state.location));
@@ -1507,48 +1512,54 @@ function updateSummary(weather) {
       }
     }
 
-    async function refreshWeather(focusMap = false) {
-      if (!state.location) return;
+  async function refreshWeather(focusMap = false) {
+  if (!state.location) return;
 
-      try {
-        if (!navigator.onLine && state.weather) {
-          state.isOffline = true;
-          updateSummary(state.weather);
-          toast('Zeige zwischengespeicherte Daten');
-          await updateRadar();
-          return;
-        }
-
-        setStatus('AKTUALISIERE');
-        const weather = await fetchWeatherForLocation(state.location);
-        state.weather = weather;
-        state.lastUpdate = Date.now();
-        state.isOffline = false;
-
-        persistCache();
-        updateSummary(weather);
-        await updateFavoriteTemperatures();
-        await updateRadar();
-        scheduleRelayout();
-
-        if (focusMap && state.map) {
-          state.map.setView([state.location.latitude, state.location.longitude], 7, { animate: false });
-        }
-      } catch (error) {
-        console.error(error);
-        const message = error && error.message ? error.message : 'Unbekannter Fehler';
-        state.isOffline = !navigator.onLine;
-        updateStatusLabel();
-        els.footerLeft.innerHTML = `FEHLER <strong>${message.replace(/</g, '&lt;').replace(/>/g, '&gt;').slice(0, 80)}</strong>`;
-
-        if (state.weather) {
-          updateSummary(state.weather);
-          toast(`Fehler: ${message}`);
-        } else {
-          toast(`Fehler: ${message}`);
-        }
-      }
+  try {
+    if (!navigator.onLine && state.weather) {
+      state.isOffline = true;
+      updateSummary(state.weather);
+      toast('Zeige zwischengespeicherte Daten');
+      await updateRadar();
+      return;
     }
+
+    setStatus('AKTUALISIERE');
+
+    const weather = await fetchWeatherForLocation(state.location);
+    state.weather = weather;
+    state.lastUpdate = Date.now();
+    state.isOffline = false;
+
+    persistCache();
+    updateSummary(weather);
+
+    updateFavoriteTemperatures().catch(console.error);
+    updateRadar().catch(console.error);
+    scheduleRelayout();
+
+    if (focusMap && state.map) {
+      state.map.setView(
+        [state.location.latitude, state.location.longitude],
+        7,
+        { animate: false }
+      );
+    }
+  } catch (error) {
+    console.error(error);
+    const message = error && error.message ? error.message : 'Unbekannter Fehler';
+    state.isOffline = !navigator.onLine;
+    updateStatusLabel();
+    els.footerLeft.innerHTML = `FEHLER <strong>${message.replace(/</g, '&lt;').replace(/>/g, '&gt;').slice(0, 80)}</strong>`;
+
+    if (state.weather) {
+      updateSummary(state.weather);
+      toast(`Fehler: ${message}`);
+    } else {
+      toast(`Fehler: ${message}`);
+    }
+  }
+}
 
     async function initializeLocation() {
       if (state.location) return;
@@ -1863,44 +1874,69 @@ function scheduleRelayout() {
 
 async function init() {
   installDynamicManifest();
-  updateAppHeight();
+  updateAppHeight(true);
   loadStoredData();
+  updateClock();
   setInterval(updateClock, 1000 * 30);
 
   setupSearch();
   setupNetworkEvents();
   setupChartInteractions();
 
-	els.refreshButton.addEventListener('click', async () => {
-  toast('AKTUALISIERE');
-  await refreshWeather(true);
-});
-
-els.hereButton.addEventListener('click', async () => {
-  const detected = await detectLocation();
-
-  if (detected) {
-    const named = await reverseGeocode(detected.latitude, detected.longitude);
-    state.location = named || detected;
-
-    persistCurrentLocation();
-    toast('AKTUELLER ORT');
-
+  els.refreshButton.addEventListener('click', async () => {
+    toast('AKTUALISIERE');
     await refreshWeather(true);
-  } else {
-    toast('ORT NICHT VERFÜGBAR');
-  }
-});
+  });
+
+  els.hereButton.addEventListener('click', async () => {
+    const detected = await detectLocation();
+
+    if (detected) {
+      const named = await reverseGeocode(detected.latitude, detected.longitude);
+      state.location = named || detected;
+      persistCurrentLocation();
+      toast('AKTUELLER ORT');
+      await refreshWeather(true);
+    } else {
+      toast('ORT NICHT VERFÜGBAR');
+    }
+  });
 
   initMap();
   renderFavorites();
+  updateStatusLabel();
 
-  await initializeLocation();
-  await refreshWeather(true);
+  if (state.location) {
+    els.locationName.textContent = state.location.name;
+  }
+
+  if (state.weather) {
+    updateSummary(state.weather);
+
+    if (state.map && state.location) {
+      state.map.setView(
+        [state.location.latitude, state.location.longitude],
+        7,
+        { animate: false }
+      );
+    }
+
+    if (state.radarTimestamp) {
+      els.radarTime.textContent = `RADAR ${formatTime(state.radarTimestamp)}`;
+    }
+  } else {
+    setStatus('LÄDT');
+  }
 
   requestAnimationFrame(relayoutApp);
   setTimeout(relayoutApp, 100);
-  setTimeout(relayoutApp, 400);
+  setTimeout(relayoutApp, 300);
+
+  await initializeLocation();
+
+  refreshWeather(true).catch(error => {
+    console.error(error);
+  });
 
   registerServiceWorker();
 }
