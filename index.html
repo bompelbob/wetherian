@@ -981,7 +981,7 @@ function loadStoredData() {
       const url = new URL('https://api.open-meteo.com/v1/forecast');
       url.searchParams.set('latitude', location.latitude);
       url.searchParams.set('longitude', location.longitude);
-      url.searchParams.set('daily', 'sunrise,sunset,temperature_2m_min,temperature_2m_max,precipitation_sum');
+      url.searchParams.set('daily', 'sunrise,sunset,temperature_2m_min,temperature_2m_max,precipitation_sum,weather_code');
       url.searchParams.set('current', 'temperature_2m');
       url.searchParams.set('forecast_days', '4');
       url.searchParams.set('timezone', 'auto');
@@ -1010,12 +1010,13 @@ function extractBaseForecast72h(apiData) {
     currentTemp: apiData.current?.temperature_2m ?? null,
     sunrise: apiData.daily?.sunrise?.[0] ?? null,
     sunset: apiData.daily?.sunset?.[0] ?? null,
+    dailyTimes: apiData.daily?.time || [],
     dailyMin: apiData.daily?.temperature_2m_min || [],
     dailyMax: apiData.daily?.temperature_2m_max || [],
-    dailyRain: apiData.daily?.precipitation_sum || []
+    dailyRain: apiData.daily?.precipitation_sum || [],
+    dailyWeatherCodes: apiData.daily?.weather_code || []
   };
 }
-
     async function fetchWeatherForLocation(location) {
       const baseResult = await fetchBaseForecast(location);
       const base = extractBaseForecast72h(baseResult);
@@ -1053,9 +1054,11 @@ return {
   currentTemp: base.currentTemp ?? byModel[referenceKey].temps[0],
   temps: base.temps,
   weatherCodes: base.weatherCodes,
+  dailyTimes: base.dailyTimes,
   dailyMin: base.dailyMin,
   dailyMax: base.dailyMax,
-  dailyRain: base.dailyRain
+  dailyRain: base.dailyRain,
+  dailyWeatherCodes: base.dailyWeatherCodes
 };
     }
 
@@ -1381,54 +1384,34 @@ function weatherIconSvg(code) {
 
 function renderDailySummary(weather) {
   if (!els.dailySummary) return;
-  if (!weather || !weather.times || !weather.temps || !weather.weatherCodes) {
+
+  if (
+    !weather ||
+    !weather.dailyTimes?.length ||
+    !weather.dailyMin?.length ||
+    !weather.dailyMax?.length
+  ) {
     els.dailySummary.innerHTML = '';
     return;
   }
 
-  const groups = new Map();
+  const count = Math.min(
+    4,
+    weather.dailyTimes.length,
+    weather.dailyMin.length,
+    weather.dailyMax.length
+  );
 
-  weather.times.forEach((time, i) => {
-    const d = new Date(time);
-    const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-
-    if (!groups.has(key)) {
-      groups.set(key, {
-        date: d,
-        temps: [],
-        rain: [],
-        codes: []
-      });
-    }
-
-    const entry = groups.get(key);
-    entry.temps.push(weather.temps[i]);
-    entry.rain.push(weather.rain[i]);
-    entry.codes.push(weather.weatherCodes[i]);
-  });
-
-  const days = [...groups.values()].slice(0, 4);
-
-  els.dailySummary.innerHTML = days.map((day, index) => {
-    let min, max, rain;
-
-    if (index === 0 && weather.dailyMin?.length) {
-      min = Math.round(weather.dailyMin[0]);
-      max = Math.round(weather.dailyMax[0]);
-      rain = weather.dailyRain?.length
-        ? weather.dailyRain[0]
-        : day.rain.reduce((sum, v) => sum + (v || 0), 0);
-    } else {
-      min = Math.round(Math.min(...day.temps));
-      max = Math.round(Math.max(...day.temps));
-      rain = day.rain.reduce((sum, v) => sum + (v || 0), 0);
-    }
-
-    const code = getDailyWeatherCode(day.codes);
+  els.dailySummary.innerHTML = Array.from({ length: count }, (_, index) => {
+    const date = new Date(weather.dailyTimes[index]);
+    const min = Math.round(weather.dailyMin[index]);
+    const max = Math.round(weather.dailyMax[index]);
+    const rain = Number(weather.dailyRain?.[index] ?? 0);
+    const code = weather.dailyWeatherCodes?.[index] ?? 3;
 
     return `
       <div class="daily-card">
-        <div class="daily-day">${getDayLabel(day.date, index)}</div>
+        <div class="daily-day">${getDayLabel(date, index)}</div>
         ${weatherIconSvg(code)}
         <div class="daily-temp">${min}° / ${max}°</div>
         <div class="daily-rain">${rain.toFixed(1)} MM</div>
