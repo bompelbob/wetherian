@@ -831,10 +831,6 @@
       toast._timer = setTimeout(() => els.toast.classList.remove('show'), 2200);
     }
 
-    function updateClock() {
-      els.clock.textContent = formatTime(new Date());
-    }
-
     function formatTime(dateLike) {
       const d = new Date(dateLike);
       return d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
@@ -1876,8 +1872,6 @@ async function init() {
   installDynamicManifest();
   updateAppHeight(true);
   loadStoredData();
-  updateClock();
-  setInterval(updateClock, 1000 * 30);
 
   setupSearch();
   setupNetworkEvents();
